@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Mail } from 'lucide-react'
+import { ArrowLeft, Mail, Pencil, Phone } from 'lucide-react'
+import EmployeeFormDialog from '@/components/EmployeeFormDialog'
 import { formatDate, useEmployeeOverview } from '@workspace/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,6 +20,7 @@ export default function EmployeeDetail() {
   const can = useCan()
   const { data, isLoading } = useEmployeeOverview(id)
   const [tab, setTab] = useState<Tab>('assets')
+  const [editing, setEditing] = useState(false)
   useEffect(() => { if (data) pushRecent({ url: `/employees/${id}`, label: data.employee.name, sublabel: 'Employee', kind: 'page', icon: null }) }, [data, id])
   if (isLoading) return <p className="p-8 text-center text-sm text-gray-400">Loading…</p>
   if (!data) return <EmptyState title="Employee not found" />
@@ -33,12 +35,14 @@ export default function EmployeeDetail() {
           <p className="text-sm text-gray-500">{[e.title, (e.business_units ?? []).join(', ')].filter(Boolean).join(' · ') || '—'}</p>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
             {e.email && <a className="inline-flex items-center gap-1 hover:underline" href={`mailto:${e.email}`}><Mail className="h-3 w-3" />{e.email}</a>}
+            {e.phone && <a className="inline-flex items-center gap-1 hover:underline" href={`tel:${e.phone}`}><Phone className="h-3 w-3" />{e.phone}</a>}
             {e.join_date && <span>Joined {formatDate(e.join_date)}</span>}
             {e.resignation_date && <span>Left {formatDate(e.resignation_date)}</span>}
             {(e.regions ?? []).length > 0 && <span>{(e.regions ?? []).join(', ')}</span>}
           </div>
         </div>
-        {e.active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}
+        {e.active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Resigned</Badge>}
+        {can('employee.manage') && <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" />Edit</Button>}
         {e.active && (can('asset.edit') || can('record.edit')) && <Button variant="outline" size="sm" onClick={() => navigate('/quick-actions?tab=offboard')}>Offboard…</Button>}
       </CardContent></Card>
 
@@ -61,6 +65,7 @@ export default function EmployeeDetail() {
           <span className="ml-2 text-xs text-gray-500">{s.record_type_name}{s.product && ` · ${s.product}`}{s.since && ` · since ${formatDate(s.since)}`}</span></li>
       ))}</ul> : <EmptyState title="Holds no license seats" />)}
       {tab === 'documents' && <LinkedDocuments link={{ entity_type: 'employee', entity_id: id }} />}
+      {editing && <EmployeeFormDialog employee={e} onClose={() => setEditing(false)} />}
     </div>
   )
 }

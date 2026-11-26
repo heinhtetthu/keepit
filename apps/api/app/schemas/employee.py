@@ -27,6 +27,7 @@ class EmployeeCreate(BaseModel):
     title: str | None = Field(default=None, max_length=100)
     active: bool = True
     username: str | None = Field(default=None, max_length=100)
+    phone: str | None = Field(default=None, max_length=50)
     regions: list[str] = Field(default_factory=list)
     gender: Literal["Male", "Female", "Other"] | None = None
     avatar_url: str | None = Field(default=None, max_length=2000)
@@ -47,6 +48,7 @@ class EmployeeUpdate(BaseModel):
     title: str | None = Field(default=None, max_length=100)
     active: bool | None = None
     username: str | None = Field(default=None, max_length=100)
+    phone: str | None = Field(default=None, max_length=50)
     regions: list[str] | None = None
     gender: Literal["Male", "Female", "Other"] | None = None
     avatar_url: str | None = Field(default=None, max_length=2000)
@@ -69,6 +71,7 @@ class EmployeeResponse(BaseModel):
     title: str | None
     active: bool
     username: str | None = None
+    phone: str | None = None
     regions: list[str] = []
     gender: str | None = None
     avatar_url: str | None = None

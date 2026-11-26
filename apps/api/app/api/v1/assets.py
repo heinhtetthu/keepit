@@ -1,5 +1,3 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,17 +13,12 @@ DB = Depends(get_db, scope="function")
 
 @router.get("", response_model=s.AssetListResponse)
 async def list_assets(
-    q: str | None = Query(None, max_length=200), asset_type: str | None = None,
-    assignment_status: str | None = None, condition_status: str | None = None,
-    employee_id: int | None = None, location: str | None = None, warranty_before: date | None = None,
-    deleted: bool = False, sort: str = "created_at", order: str = Query("desc", pattern="^(asc|desc)$"),
+    filters: s.AssetFilters = Depends(),
+    sort: str = "created_at", order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = DB, user=Depends(require_permission("asset.view")),
 ):
-    return await svc.list_assets(db, q=q, asset_type=asset_type, assignment_status=assignment_status,
-                                 condition_status=condition_status, employee_id=employee_id, location=location,
-                                 warranty_before=warranty_before, deleted=deleted, sort=sort, order=order,
-                                 page=page, page_size=page_size)
+    return await svc.list_assets(db, filters, sort=sort, order=order, page=page, page_size=page_size)
 
 
 @router.post("", response_model=s.AssetResponse, status_code=201)

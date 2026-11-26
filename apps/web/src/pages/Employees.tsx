@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { TableCard, TableScrollArea, RowsPerPageSelect, MiniPager, TableFooterInfo, usePageSize, TH_STICKY } from '../components/table_shell'
+import { TableCard, TableScrollArea, usePageSize, TH_STICKY, TablePager } from '../components/table_shell'
 import { cn } from '@/lib/utils'
 import type { Employee } from '../types'
 import RowMenu from '@/components/ui/menu'
 import OffboardDialog from '../components/OffboardDialog'
+import EmployeeFormDialog from '../components/EmployeeFormDialog'
+import { formatDate } from '@workspace/core'
 import { Select } from '@/components/ui/select'
 
 interface BusinessUnit {
@@ -78,17 +80,6 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
     queryClient.invalidateQueries({ queryKey: ['employees'] })
     queryClient.invalidateQueries({ queryKey: ['business-units'] })
   }
-
-  const saveMutation = useMutation({
-    mutationFn: async (arg: { id: number | null; payload: Record<string, unknown> }) =>
-      arg.id ? api.put(`/employees/${arg.id}`, arg.payload) : api.post('/employees', arg.payload),
-    onSuccess: () => {
-      invalidate()
-      setEditing(null)
-      setError('')
-    },
-    onError: (err: any) => setError(err.response?.data?.error?.message || 'Failed to save employee'),
-  })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => api.delete(`/employees/${id}`),
@@ -179,24 +170,6 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
     onError: (err: any) => setImportError(err.response?.data?.error?.message || err.response?.data?.detail || 'Import failed'),
   })
 
-  const submitEdit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editing) return
-    const form = editing as unknown as { name?: string }
-    if (!(form.name || '').trim()) return
-    saveMutation.mutate({
-      id: editing.id,
-      payload: {
-        name: editing.name.trim(),
-        email: editing.email?.trim() || null,
-        business_units: editing.business_units,
-        title: editing.title?.trim() || null,
-        active: editing.active,
-      },
-    })
-  }
-
-  const emp = editing
 
   /* client-side search + pagination for the employee table */
   const filteredEmployees = (employees || []).filter((e) =>
@@ -330,7 +303,7 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
               </div>
               <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer whitespace-nowrap">
                 <input type="checkbox" className="h-4 w-4" checked={showInactive} onChange={(e) => { setShowInactive(e.target.checked); setEmpPage(1) }} />
-                Include inactive
+                Include resigned
               </label>
               {canManage && <div className="flex gap-2 ml-auto">
                 <Button variant="outline" size="sm" onClick={() => { setImportFile(null); setImportPreview(null); setImportError(''); setShowImport(true) }}>
@@ -343,15 +316,7 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
             </div>
           </>
         }
-        footer={
-          <>
-            <TableFooterInfo shown={empPageRows.length} total={filteredEmployees.length} noun={`employee${filteredEmployees.length === 1 ? '' : 's'}`} />
-            <div className="flex items-center gap-3 justify-end">
-              <RowsPerPageSelect value={empPageSize} onChange={(n) => { setEmpPageSize(n); setEmpPage(1) }} />
-              <MiniPager page={empCurPage} pages={empPages} onPage={setEmpPage} />
-            </div>
-          </>
-        }
+        footer={<TablePager shown={empPageRows.length} total={filteredEmployees.length} noun={`employee${filteredEmployees.length === 1 ? '' : 's'}`} page={empCurPage} pages={empPages} onPage={setEmpPage} pageSize={empPageSize} onPageSize={(n) => { setEmpPageSize(n); setEmpPage(1) }} />}
       >
         <TableScrollArea className="flex-1 min-h-0">
           {isLoading ? (
@@ -379,9 +344,10 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
                       />
                     </th>
                     <th className={cn('px-3 py-2', TH_STICKY)}>Name</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Email</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Business unit</th>
                     <th className={cn('px-3 py-2', TH_STICKY)}>Title</th>
+                    <th className={cn('px-3 py-2', TH_STICKY)}>Business units</th>
+                    <th className={cn('px-3 py-2', TH_STICKY)}>Contact</th>
+                    <th className={cn('px-3 py-2', TH_STICKY)}>Joined</th>
                     <th className={cn('px-3 py-2', TH_STICKY)}>Status</th>
                     <th className={cn('px-3 py-2 text-right', TH_STICKY)}>Actions</th>
                   </tr>
@@ -407,7 +373,7 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
                           <Link to={`/employees/${e.id}`} className="font-medium text-gray-800 truncate hover:underline">{e.name}</Link>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-gray-500">{e.email || '-'}</td>
+                      <td className="px-3 py-2 text-gray-600">{e.title || <span className="text-gray-300">—</span>}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {(e.business_units || []).length ? (
@@ -417,9 +383,15 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
                           ) : <span className="text-gray-300">-</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-gray-500">{e.title || '-'}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant={e.active ? 'success' : 'secondary'}>{e.active ? 'Active' : 'Inactive'}</Badge>
+                      <td className="px-3 py-2 text-xs text-gray-500">
+                        {e.email ? <a href={`mailto:${e.email}`} className="block truncate hover:text-primary hover:underline">{e.email}</a> : null}
+                        {e.phone ? <a href={`tel:${e.phone}`} className="block hover:text-primary hover:underline">{e.phone}</a> : null}
+                        {!e.email && !e.phone && <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">{e.join_date ? formatDate(e.join_date) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <Badge variant={e.active ? 'success' : 'secondary'}>{e.active ? 'Active' : 'Resigned'}</Badge>
+                        {!e.active && e.resignation_date && <span className="mt-0.5 block text-[11px] text-gray-500">{formatDate(e.resignation_date)}</span>}
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         <RowMenu label={`Actions for ${e.name}`} items={[
@@ -434,7 +406,7 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
                     </tr>
                   ))}
                   {empPageRows.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No employees match your search.</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No employees match your search.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -513,89 +485,7 @@ export default function EmployeesPanel({ show = 'all' }: { show?: 'all' | 'emplo
         )}
 
       {/* Add / edit employee */}
-      {emp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(null)}>
-          <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <CardHeader>
-              <CardTitle className="text-base">{emp.id ? `Edit ${emp.name || 'employee'}` : 'Add employee'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={submitEdit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Name <span className="text-red-500">*</span></label>
-                  <Input value={emp.name} onChange={(e) => setEditing({ ...emp, name: e.target.value })} required autoFocus />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">Email</label>
-                    <Input type="email" value={emp.email || ''} onChange={(e) => setEditing({ ...emp, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">
-                      Business units <span className="text-xs text-gray-400 font-normal">(any number)</span>
-                    </label>
-                    <div className="rounded-md border px-3 py-2 space-y-1.5 max-h-36 overflow-y-auto">
-                      {(businessUnits || []).map((b) => (
-                        <label key={b.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked={(emp.business_units || []).includes(b.name)}
-                            onChange={(e) => {
-                              const cur = emp.business_units || []
-                              setEditing({
-                                ...emp,
-                                business_units: e.target.checked ? [...cur, b.name] : cur.filter((u) => u !== b.name),
-                              })
-                            }}
-                          />
-                          {b.name}
-                        </label>
-                      ))}
-                      {(emp.business_units || []).filter((u) => !(businessUnits || []).some((b) => b.name === u)).map((u) => (
-                        <label key={u} className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4"
-                            checked
-                            onChange={() => setEditing({
-                              ...emp,
-                              business_units: (emp.business_units || []).filter((x) => x !== u),
-                            })}
-                          />
-                          {u} <span className="text-xs text-gray-400">(custom)</span>
-                        </label>
-                      ))}
-                      {(businessUnits || []).length === 0 && (
-                        <p className="text-xs text-gray-400">No business units defined - add them above first.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Title</label>
-                  <Input value={emp.title || ''} onChange={(e) => setEditing({ ...emp, title: e.target.value })} />
-                </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={emp.active}
-                    onChange={(e) => setEditing({ ...emp, active: e.target.checked })}
-                  />
-                  Active
-                </label>
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-                  <Button type="submit" disabled={saveMutation.isPending}>
-                    {saveMutation.isPending ? 'Saving…' : emp.id ? 'Save changes' : 'Add employee'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {editing && <EmployeeFormDialog employee={editing.id ? editing : undefined} onClose={() => setEditing(null)} onSaved={invalidate} />}
 
       {/* Import modal - CSV / XLSX upload (click or drag & drop) + column matching */}
       {showImport && createPortal(

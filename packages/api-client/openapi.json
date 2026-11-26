@@ -3194,6 +3194,18 @@
       "title": "Name",
       "type": "string"
      },
+     "phone": {
+      "anyOf": [
+       {
+        "maxLength": 50,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
      "regions": {
       "items": {
        "type": "string"
@@ -3393,6 +3405,17 @@
       "title": "Name",
       "type": "string"
      },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
      "regions": {
       "default": [],
       "items": {
@@ -3556,6 +3579,18 @@
        }
       ],
       "title": "Name"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "maxLength": 50,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
      },
      "regions": {
       "anyOf": [
@@ -8301,130 +8336,6 @@
     "parameters": [
      {
       "in": "query",
-      "name": "q",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "maxLength": 200,
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Q"
-      }
-     },
-     {
-      "in": "query",
-      "name": "asset_type",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Asset Type"
-      }
-     },
-     {
-      "in": "query",
-      "name": "assignment_status",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Assignment Status"
-      }
-     },
-     {
-      "in": "query",
-      "name": "condition_status",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Condition Status"
-      }
-     },
-     {
-      "in": "query",
-      "name": "employee_id",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "integer"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Employee Id"
-      }
-     },
-     {
-      "in": "query",
-      "name": "location",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Location"
-      }
-     },
-     {
-      "in": "query",
-      "name": "warranty_before",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "format": "date",
-         "type": "string"
-        },
-        {
-         "type": "null"
-        }
-       ],
-       "title": "Warranty Before"
-      }
-     },
-     {
-      "in": "query",
-      "name": "deleted",
-      "required": false,
-      "schema": {
-       "default": false,
-       "title": "Deleted",
-       "type": "boolean"
-      }
-     },
-     {
-      "in": "query",
       "name": "sort",
       "required": false,
       "schema": {
@@ -8465,6 +8376,348 @@
        "minimum": 1,
        "title": "Page Size",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "asset_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Asset Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "assignment_status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Assignment Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "condition_status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Condition Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "location",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Location"
+      }
+     },
+     {
+      "in": "query",
+      "name": "brand",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Brand"
+      }
+     },
+     {
+      "in": "query",
+      "name": "supplier",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Supplier"
+      }
+     },
+     {
+      "in": "query",
+      "name": "model",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Model"
+      }
+     },
+     {
+      "in": "query",
+      "name": "business_unit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Business Unit"
+      }
+     },
+     {
+      "in": "query",
+      "name": "employee_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "purchase_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Purchase From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "purchase_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Purchase To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_before",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty Before"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "active",
+          "expiring",
+          "expired",
+          "none"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_min",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Min"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_max",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Max"
+      }
+     },
+     {
+      "in": "query",
+      "name": "open_repair",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Open Repair"
+      }
+     },
+     {
+      "in": "query",
+      "name": "deleted",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Deleted",
+       "type": "boolean"
       }
      }
     ],
@@ -15995,6 +16248,463 @@
      }
     ],
     "summary": "Allocation Report",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/assets": {
+   "get": {
+    "description": "Asset reports this user can open.",
+    "operationId": "catalog_api_v1_reports_assets_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Catalog",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/v1/reports/assets/{kind}": {
+   "get": {
+    "operationId": "run_report_api_v1_reports_assets__kind__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "title": "Kind",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "default": "json",
+       "pattern": "^(json|csv)$",
+       "title": "Format",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "asset_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Asset Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "assignment_status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Assignment Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "condition_status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Condition Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "location",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Location"
+      }
+     },
+     {
+      "in": "query",
+      "name": "brand",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Brand"
+      }
+     },
+     {
+      "in": "query",
+      "name": "supplier",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Supplier"
+      }
+     },
+     {
+      "in": "query",
+      "name": "model",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Model"
+      }
+     },
+     {
+      "in": "query",
+      "name": "business_unit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 1000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Business Unit"
+      }
+     },
+     {
+      "in": "query",
+      "name": "employee_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "purchase_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Purchase From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "purchase_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Purchase To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty_before",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty Before"
+      }
+     },
+     {
+      "in": "query",
+      "name": "warranty",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "active",
+          "expiring",
+          "expired",
+          "none"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Warranty"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_min",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Min"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_max",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 0.0,
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Max"
+      }
+     },
+     {
+      "in": "query",
+      "name": "open_repair",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Open Repair"
+      }
+     },
+     {
+      "in": "query",
+      "name": "deleted",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Deleted",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Run Report",
     "tags": [
      "reports"
     ]

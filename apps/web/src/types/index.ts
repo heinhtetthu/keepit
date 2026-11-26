@@ -195,6 +195,10 @@ export interface Employee {
   business_units: string[]
   title: string | null
   active: boolean
+  phone?: string | null
+  join_date?: string | null
+  resignation_date?: string | null
+  gender?: string | null
   created_at: string
   updated_at: string
 }

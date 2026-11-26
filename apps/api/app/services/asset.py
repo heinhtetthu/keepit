@@ -56,31 +56,66 @@ async def _employee(db: AsyncSession, employee_id: int) -> Employee:
 
 
 # ---------------------------------------------------------------- queries
-async def list_assets(db: AsyncSession, *, q: str | None = None, asset_type: str | None = None,
-                      assignment_status: str | None = None, condition_status: str | None = None,
-                      employee_id: int | None = None, location: str | None = None,
-                      warranty_before: date | None = None, deleted: bool = False,
-                      sort: str = "created_at", order: str = "desc", page: int = 1, page_size: int = 50) -> dict[str, Any]:
-    stmt = select(Asset).where(Asset.deleted_at.isnot(None) if deleted else Asset.deleted_at.is_(None))
-    if q:
-        like = f"%{q.strip()}%"
-        stmt = stmt.outerjoin(Employee, Employee.id == Asset.employee_id).where(or_(
+def _csv(v: str | None) -> list[str]:
+    return [x.strip() for x in (v or "").split(",") if x.strip()]
+
+
+def asset_filter_stmt(f: "s.AssetFilters"):
+    """One definition of every asset filter, shared by the list and the reports."""
+    stmt = select(Asset).where(Asset.deleted_at.isnot(None) if f.deleted else Asset.deleted_at.is_(None))
+    if f.q:
+        like = f"%{f.q.strip()}%"
+        stmt = stmt.where(or_(
             (func.coalesce(Asset.brand, "") + " " + func.coalesce(Asset.model, "") + " "
              + func.coalesce(Asset.serial_number, "")).ilike(like),
-            Asset.asset_type.ilike(like), Asset.location.ilike(like), Employee.name.ilike(like),
+            Asset.asset_type.ilike(like), Asset.location.ilike(like), Asset.supplier.ilike(like), Asset.notes.ilike(like),
+            Asset.employee_id.in_(select(Employee.id).where(Employee.name.ilike(like))),
         ))
-    if asset_type:
-        stmt = stmt.where(Asset.asset_type == asset_type)
-    if assignment_status:
-        stmt = stmt.where(Asset.assignment_status == assignment_status)
-    if condition_status:
-        stmt = stmt.where(Asset.condition_status == condition_status)
-    if employee_id:
-        stmt = stmt.where(Asset.employee_id == employee_id)
-    if location:
-        stmt = stmt.where(Asset.location == location)
-    if warranty_before:
-        stmt = stmt.where(Asset.warranty_end_date.isnot(None), Asset.warranty_end_date <= warranty_before)
+    for col, raw in ((Asset.asset_type, f.asset_type), (Asset.assignment_status, f.assignment_status),
+                     (Asset.condition_status, f.condition_status), (Asset.location, f.location),
+                     (Asset.brand, f.brand), (Asset.supplier, f.supplier)):
+        vals = _csv(raw)
+        if vals:
+            stmt = stmt.where(col.in_(vals))
+    if f.model:
+        stmt = stmt.where(Asset.model.ilike(f"%{f.model.strip()}%"))
+    if f.employee_id:
+        stmt = stmt.where(Asset.employee_id == f.employee_id)
+    units = _csv(f.business_unit)
+    if units:
+        stmt = stmt.where(Asset.employee_id.in_(select(Employee.id).where(or_(*[Employee.business_units.contains([u]) for u in units]))))
+    if f.purchase_from:
+        stmt = stmt.where(Asset.purchase_date >= f.purchase_from)
+    if f.purchase_to:
+        stmt = stmt.where(Asset.purchase_date <= f.purchase_to)
+    if f.warranty_from:
+        stmt = stmt.where(Asset.warranty_end_date >= f.warranty_from)
+    if f.warranty_to or f.warranty_before:
+        stmt = stmt.where(Asset.warranty_end_date <= (f.warranty_to or f.warranty_before))
+    if f.warranty:
+        d0 = _today()
+        if f.warranty == "active":
+            stmt = stmt.where(Asset.warranty_end_date >= d0)
+        elif f.warranty == "expiring":
+            from datetime import timedelta
+            stmt = stmt.where(Asset.warranty_end_date.between(d0, d0 + timedelta(days=90)))
+        elif f.warranty == "expired":
+            stmt = stmt.where(Asset.warranty_end_date < d0)
+        elif f.warranty == "none":
+            stmt = stmt.where(Asset.warranty_end_date.is_(None))
+    if f.cost_min is not None:
+        stmt = stmt.where(Asset.purchase_cost >= f.cost_min)
+    if f.cost_max is not None:
+        stmt = stmt.where(Asset.purchase_cost <= f.cost_max)
+    if f.open_repair is not None:
+        open_ids = select(AssetRepair.asset_id).where(AssetRepair.status == "In Progress")
+        stmt = stmt.where(Asset.id.in_(open_ids) if f.open_repair else Asset.id.notin_(open_ids))
+    return stmt
+
+
+async def list_assets(db: AsyncSession, f: "s.AssetFilters", *, sort: str = "created_at", order: str = "desc",
+                      page: int = 1, page_size: int = 50) -> dict[str, Any]:
+    stmt = asset_filter_stmt(f)
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
     col = SORTABLE.get(sort, Asset.created_at)
     stmt = stmt.order_by(col.desc().nullslast() if order == "desc" else col.asc().nullslast(), Asset.id.desc())

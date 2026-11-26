@@ -314,3 +314,27 @@ class OffboardRequest(BaseModel):
     close_borrows: bool = True
     release_seats: bool = True
     deactivate: bool = True
+
+
+class AssetFilters(BaseModel):
+    """Asset filters as query parameters. Multi-value filters take comma-separated lists."""
+    q: str | None = Field(default=None, max_length=200)
+    asset_type: str | None = Field(default=None, max_length=1000)
+    assignment_status: str | None = Field(default=None, max_length=200)
+    condition_status: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=1000)
+    brand: str | None = Field(default=None, max_length=1000)
+    supplier: str | None = Field(default=None, max_length=1000)
+    model: str | None = Field(default=None, max_length=200)
+    business_unit: str | None = Field(default=None, max_length=1000)
+    employee_id: int | None = None
+    purchase_from: date | None = None
+    purchase_to: date | None = None
+    warranty_from: date | None = None
+    warranty_to: date | None = None
+    warranty_before: date | None = None
+    warranty: Literal["active", "expiring", "expired", "none"] | None = None
+    cost_min: Decimal | None = Field(default=None, ge=0)
+    cost_max: Decimal | None = Field(default=None, ge=0)
+    open_repair: bool | None = None
+    deleted: bool = False

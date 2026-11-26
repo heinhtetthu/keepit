@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '../store/auth'
 import AccessDialog from '../components/AccessDialog'
 import RolesExplained from '../components/RolesExplained'
-import { TableCard, TableScrollArea, RowsPerPageSelect, MiniPager, TableFooterInfo, usePageSize, TH_STICKY } from '../components/table_shell'
+import { TableCard, TableScrollArea, usePageSize, TH_STICKY, TablePager } from '../components/table_shell'
 import { cn } from '@/lib/utils'
 import type { NotificationRecipient } from '../types'
 
@@ -225,15 +225,7 @@ export default function Users() {
             {canCreate && <Button className="ml-auto shrink-0" size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1" /> Add User</Button>}
           </div>
         }
-        footer={
-          <>
-            <TableFooterInfo shown={data?.items?.length || 0} total={data?.total || 0} noun="users" />
-            <div className="flex items-center gap-3 justify-end">
-              <RowsPerPageSelect value={pageSize} onChange={(n) => { setPageSize(n); setPage(1) }} />
-              <MiniPager page={page} pages={data?.total_pages || 1} onPage={setPage} />
-            </div>
-          </>
-        }
+        footer={<TablePager shown={data?.items?.length || 0} total={data?.total || 0} noun="users" page={page} pages={data?.total_pages || 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}
       >
           {error ? (
             <div className="p-4 rounded-md bg-red-50 text-red-700 text-sm">Failed to load users.</div>

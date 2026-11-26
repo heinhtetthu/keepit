@@ -7,7 +7,7 @@ Keepit is a renewals and IT-asset management app: a FastAPI + PostgreSQL + React
 1. **Never commit secrets.** `.env` and `apps/api/.env` are git-ignored; `.env.example` shows the shape.
 2. **Commit only when asked.**
 3. Match existing conventions. Check `package.json` / `requirements.txt` before adding a library.
-4. Migrations are append-only (head: `0003_row_level_security`). Use `alembic revision --autogenerate` and keep `alembic check` clean.
+4. Migrations are append-only (head: `0004_employee_phone`). Use `alembic revision --autogenerate` and keep `alembic check` clean.
 5. `Mapped["X"]` annotations cause 8 known ruff F821 false positives. Gate with `ruff check app tests --select F401,F811,E9`.
 
 ## Layout

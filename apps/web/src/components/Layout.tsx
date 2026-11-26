@@ -161,7 +161,7 @@ export default function Layout() {
       </div>
 
       {/* Phone tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Quick navigation">
+      <nav data-bottom-nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Quick navigation">
         <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center">
           {[{ to: '/dashboard', icon: LayoutDashboard, label: 'Home', p: ['record.view', 'asset.view'] }, { to: '/assets', icon: Laptop, label: 'Assets', p: 'asset.view' }].map((t) => allowed(t.p) ? (
             <NavLink key={t.to} to={t.to} className={({ isActive }) => cn('flex flex-col items-center gap-0.5 text-[10.5px] font-medium', isActive ? 'text-primary' : 'text-gray-500')}><t.icon className="h-5 w-5" />{t.label}</NavLink>

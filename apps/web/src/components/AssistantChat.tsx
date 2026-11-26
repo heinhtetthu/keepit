@@ -160,7 +160,9 @@ export default function AssistantChat() {
       )}
 
       <button onClick={() => setOpen(!open)} aria-label={open ? 'Close assistant' : 'Open assistant'} aria-expanded={open}
-        className="press flex h-12 items-center gap-2 rounded-2xl bg-brand-gradient px-3.5 text-sm font-medium text-primary-foreground shadow-[0_10px_24px_-6px_hsl(var(--primary)/0.6)] hover:scale-[1.03]">
+        className={cn('press flex h-12 items-center gap-2 rounded-2xl border px-3.5 text-sm font-medium backdrop-blur-md transition-all duration-200',
+          open ? 'border-transparent bg-primary text-primary-foreground shadow-lift'
+            : 'border-primary/25 bg-primary/10 text-primary shadow-soft hover:border-transparent hover:bg-primary hover:text-primary-foreground hover:shadow-lift')}>
         {open ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
         <span className={cn('hidden sm:inline', open && 'sm:hidden')}>Ask {brand}</span>
       </button>

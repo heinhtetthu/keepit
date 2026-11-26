@@ -4,7 +4,7 @@ from app.api.v1 import security
 from app.api.v1 import operations
 from app.api.v1 import report_jobs
 
-from app.api.v1 import user_access, branding
+from app.api.v1 import user_access, branding, asset_reports
 from app.api.v1 import account, assets, borrows, documents, extraction, reference, workspace
 from app.api.v1 import auth, users, record_types, records, assignments, employees, business_units, reminders, reports, audit, health, dashboard, settings, views, import_records, search
 
@@ -15,6 +15,7 @@ api_router.include_router(report_jobs.router)
 api_router.include_router(help.router)
 api_router.include_router(auth.router)
 api_router.include_router(branding.router)
+api_router.include_router(asset_reports.router)
 api_router.include_router(user_access.router)
 api_router.include_router(users.router)
 api_router.include_router(record_types.router)

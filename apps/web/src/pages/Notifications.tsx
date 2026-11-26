@@ -10,7 +10,7 @@ import Modal from '@/components/ui/modal'
 import RowMenu from '@/components/ui/menu'
 import Avatar from '@/components/ui/avatar'
 import Combobox from '@/components/ui/combobox'
-import { MiniPager } from '../components/table_shell'
+import { TablePager } from '../components/table_shell'
 import { cn } from '@/lib/utils'
 import { apiError } from '@/lib/seats'
 import { useAuthStore } from '../store/auth'
@@ -202,9 +202,8 @@ export default function Notifications() {
                   </ul>
                 </div>
               ))}
-              <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-gray-500">
-                <span>{logs?.total || 0} alerts</span>
-                <MiniPager page={page} pages={logs?.total_pages || 1} onPage={setPage} />
+              <div className="border-t px-4 py-2">
+                <TablePager shown={logs?.items?.length || 0} total={logs?.total || 0} noun="alerts" page={page} pages={logs?.total_pages || 1} onPage={setPage} />
               </div>
             </div>
           )}

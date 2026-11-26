@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Select } from '@/components/ui/select'
+import Combobox from '@/components/ui/combobox'
 
 /**
  * Shared table chrome:
@@ -47,7 +47,7 @@ export function TableCard({ children, header, footer, className }: {
       {header}
       {children}
       {footer && (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-gray-50/70 px-4 py-2.5">
+        <div className="flex shrink-0 items-center gap-3 border-t bg-gray-50/70 px-4 py-2">
           {footer}
         </div>
       )}
@@ -72,19 +72,13 @@ export function RowsPerPageSelect({ value, onChange }: {
   onChange: (n: number) => void
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-xs text-gray-500 shrink-0">
-      <span className="hidden sm:inline">Rows per page</span>
-      <Select
-        className="h-8 rounded-md border border-input bg-white px-1.5 text-xs"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        aria-label="Rows per page"
-      >
-        {PAGE_SIZE_OPTIONS.map((n) => (
-          <option key={n} value={n}>{n}</option>
-        ))}
-      </Select>
-    </label>
+    <div className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-gray-500">
+      <span>Rows per page</span>
+      <div className="w-[4.25rem]" aria-label="Rows per page">
+        <Combobox compact className="h-8 px-2.5 text-xs" value={String(value)} onChange={(v) => v && onChange(Number(v))}
+          options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} />
+      </div>
+    </div>
   )
 }
 
@@ -136,4 +130,27 @@ export function TableFooterInfo({ shown, total, noun }: {
  * table body scrolls inside TableScrollArea. Frozen cells pass their `left`
  * offset (from DynamicTable's measuring logic) as `left` to pin both axes.
  */
-export const TH_STICKY = 'sticky top-0 z-10 bg-gray-50/95 backdrop-blur text-[11px] uppercase tracking-wider'
+export const TH_STICKY = 'sticky top-0 z-10 bg-gray-50/95 backdrop-blur text-[11px] uppercase tracking-wider [&_button]:uppercase [&_button]:tracking-wider'
+
+
+/** Standard table footer: count on the left; rows-per-page and pager on one line, on the right. */
+export function TablePager({ shown, total, noun, page, pages, onPage, pageSize, onPageSize }: {
+  shown: number
+  total: number
+  noun?: string
+  page: number
+  pages: number
+  onPage: (n: number) => void
+  pageSize?: number
+  onPageSize?: (n: number) => void
+}) {
+  return (
+    <div className="flex w-full min-w-0 items-center gap-3">
+      <div className="hidden min-w-0 truncate sm:block"><TableFooterInfo shown={shown} total={total} noun={noun} /></div>
+      <div className="ml-auto flex shrink-0 items-center gap-3 whitespace-nowrap">
+        {pageSize !== undefined && onPageSize && <RowsPerPageSelect value={pageSize} onChange={onPageSize} />}
+        <MiniPager page={page} pages={Math.max(1, pages)} onPage={onPage} />
+      </div>
+    </div>
+  )
+}

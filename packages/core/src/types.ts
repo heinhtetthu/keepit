@@ -60,3 +60,14 @@ export interface ExtractionRun {
   target?: Record<string, unknown> | null
 }
 export interface CurrencySettings { default_currency: string; rates: Record<string, number> }
+
+export type AssetReportKind = 'inventory' | 'repairs' | 'maintenance' | 'borrows' | 'warranties' | 'holders'
+export interface AssetReport {
+  kind: AssetReportKind
+  title: string
+  columns: { key: string; label: string }[]
+  rows: Record<string, string | number | null>[]
+  summary: { label: string; value: string | number }[]
+  truncated: boolean
+  window?: { from: string; to: string }
+}

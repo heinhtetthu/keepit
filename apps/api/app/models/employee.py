@@ -18,6 +18,7 @@ class Employee(Base, TimestampMixin, LegacyMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(50))
     username: Mapped[str | None] = mapped_column(String(100))
     business_units: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, server_default="[]")
     regions: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, server_default="[]")

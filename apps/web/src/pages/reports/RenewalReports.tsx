@@ -4,8 +4,8 @@ import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import type { RecordType, AllocationReport } from '../types'
-import { useAuthStore } from '../store/auth'
+import type { RecordType, AllocationReport } from '../../types'
+import { useAuthStore } from '../../store/auth'
 import RenewalForecast from '@/components/RenewalForecast'
 import ReportDownloads, { downloadReportJob } from '@/components/ReportDownloads'
 import { Select } from '@/components/ui/select'
@@ -13,7 +13,10 @@ import { Select } from '@/components/ui/select'
 function ym(d: Date) { return d.toISOString().slice(0, 10) }
 function yearsAgo(n: number) { const d = new Date(); d.setFullYear(d.getFullYear() - n); return d }
 
-export default function Reports() {
+export type RenewalSection = 'forecast' | 'allocation' | 'export' | 'downloads'
+
+/** Renewal reports; the Reports hub shows one section at a time. */
+export default function RenewalReports({ section }: { section: RenewalSection }) {
   const client = useQueryClient()
   const [allocationJob, setAllocationJob] = useState<string | null>(null)
   const [allocationPage, setAllocationPage] = useState(1)
@@ -66,14 +69,14 @@ export default function Reports() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Reports</h1>
-      <ReportDownloads onOpenAllocation={id => { setAllocationJob(id); setAllocationPage(1) }} />
+    <div className="space-y-5">
+      {section === 'downloads' && <ReportDownloads onOpenAllocation={id => { setAllocationJob(id); setAllocationPage(1) }} />}
       {error && <div className="p-3 rounded-md bg-red-50 text-red-700 text-sm">{error}</div>}
-      <RenewalForecast recordTypes={recordTypes || []} />
+      {section === 'forecast' && <RenewalForecast recordTypes={recordTypes || []} />}
 
       {/* License allocation (record types with ownership tracking) */}
-      {trackedTypes.length > 0 && (
+      {section === 'allocation' && trackedTypes.length === 0 && <p className="rounded-xl border bg-white p-6 text-sm text-gray-500">No record type tracks ownership yet. Turn on ownership tracking for a type (for example Licenses) to see cost by business unit.</p>}
+      {section === 'allocation' && trackedTypes.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">License allocation - cost by business unit</CardTitle>
@@ -194,7 +197,7 @@ export default function Reports() {
       )}
 
       {/* Classic record-type export */}
-      <Card>
+      {section === 'export' && <Card>
         <CardHeader><CardTitle>Generate Report</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -228,7 +231,7 @@ export default function Reports() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 </div>
 )
 }

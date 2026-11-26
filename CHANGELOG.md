@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Reports hub with asset reports (inventory, repairs & costs, maintenance, borrows, warranty expiry, who holds what), summary tiles, sorting and CSV export (`/api/v1/reports/assets`).
+- Full asset filter panel (type, brand, model, supplier, assignment, condition, location, business unit, holder, purchase date/cost, warranty, open repair) with removable chips; filters live in the URL.
+- Employee phone (migration `0004_employee_phone`), joined date, Active/Resigned status and resignation date in one add/edit form; business units are a multi-select.
+
+### Changed
+- Every table footer: count on the left, a narrow "Rows per page" and pagination on one line on the right (`TablePager`).
+- "Ask Keepit" launcher is translucent until hovered or opened.
+- Popovers cap their height to the space on screen (above the phone tab bar); Escape in a nested dropdown no longer closes the whole panel.
+
 ## 2.0.0 — Keepit
 
 First release of the unified app (Renewly + AssetWise).

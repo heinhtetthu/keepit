@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TableCard, TableScrollArea, MiniPager, TableFooterInfo, TH_STICKY } from '../components/table_shell'
+import { TableCard, TableScrollArea, TH_STICKY, TablePager } from '../components/table_shell'
 import { useAuthStore } from '../store/auth'
 
 interface RenewalEntry {
@@ -56,10 +56,7 @@ export default function AutoRenewalLog() {
               onClick={() => { setDraft(''); setSearch(''); setPage(1) }}>Clear</Button>}
           </form>
         }
-        footer={<>
-          <TableFooterInfo shown={data?.items.length ?? 0} total={data?.total ?? 0} noun="renewals" />
-          <MiniPager page={page} pages={Math.max(1, data?.total_pages ?? page)} onPage={setPage} />
-        </>}
+        footer={<TablePager shown={data?.items.length ?? 0} total={data?.total ?? 0} noun="renewals" page={page} pages={data?.total_pages ?? page} onPage={setPage} />}
       >
         <TableScrollArea className="flex-1">
           <table className="w-full text-sm">

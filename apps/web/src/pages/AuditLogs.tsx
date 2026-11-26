@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { TableCard, TableScrollArea, RowsPerPageSelect, MiniPager, TableFooterInfo, usePageSize, TH_STICKY } from '../components/table_shell'
+import { TableCard, TableScrollArea, usePageSize, TH_STICKY, TablePager } from '../components/table_shell'
 import { cn } from '@/lib/utils'
 import type { AuditLog } from '../types'
 import { useAuthStore } from '../store/auth'
@@ -36,15 +36,7 @@ export default function AuditLogs() {
             <Input placeholder="Filter by entity type..." value={entityType} onChange={(e) => { setEntityType(e.target.value); setPage(1) }} className="w-52 sm:w-64" />
           </div>
         }
-        footer={
-          <>
-            <TableFooterInfo shown={data?.items?.length || 0} total={data?.total ?? 0} noun="entries" />
-            <div className="flex items-center gap-3 justify-end">
-              <RowsPerPageSelect value={pageSize} onChange={(n) => { setPageSize(n); setPage(1) }} />
-              <MiniPager page={page} pages={totalPages} onPage={setPage} />
-            </div>
-          </>
-        }
+        footer={<TablePager shown={data?.items?.length || 0} total={data?.total ?? 0} noun="entries" page={page} pages={totalPages} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}
       >
         <TableScrollArea className="flex-1">
           <table className="w-full text-sm">

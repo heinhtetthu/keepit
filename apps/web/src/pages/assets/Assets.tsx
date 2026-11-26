@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Download, Laptop, Plus, Search, Upload } from 'lucide-react'
 import {
-  ASSIGNMENT_STATUSES, CONDITION_STATUSES, csvToObjects, errorMessage, formatDate, daysUntil,
+  CONDITION_STATUSES, csvToObjects, errorMessage, formatDate, daysUntil,
   useAssetMutation, useAssets, useReference, type AssetCreate,
 } from '@workspace/core'
 import { Button } from '@/components/ui/button'
@@ -11,10 +11,11 @@ import { Select } from '@/components/ui/select'
 import Modal from '@/components/ui/modal'
 import RowMenu from '@/components/ui/menu'
 import { toast } from '@/components/ui/toaster'
-import { MiniPager, RowsPerPageSelect, TableCard, TableFooterInfo, TableScrollArea, TH_STICKY, usePageSize } from '@/components/table_shell'
+import { TableCard, TableScrollArea, TH_STICKY, usePageSize, TablePager } from '@/components/table_shell'
 import AssetFormDialog from '@/components/assets/AssetFormDialog'
 import { AssignDialog } from '@/components/assets/ActionDialogs'
 import { AssignmentBadge, ConditionBadge, EmptyState, Field, useCan, useConfirm } from '@/components/assets/shared'
+import AssetFilterBar, { ASSET_FILTER_KEYS, type AssetFilterValues } from '@/components/assets/AssetFilterBar'
 
 export default function Assets() {
   const can = useCan()
@@ -22,14 +23,22 @@ export default function Assets() {
   const [sp, setSp] = useSearchParams()
   const [pageSize, setPageSize] = usePageSize('assets-page-size', 25)
   const [q, setQ] = useState(sp.get('q') ?? '')
+  const filterValues: AssetFilterValues = Object.fromEntries(ASSET_FILTER_KEYS.map((k) => [k, sp.get(k) || undefined]))
+  // Legacy short keys (?type=, ?condition=) from older links and the dashboard.
+  if (!filterValues.asset_type && sp.get('type')) filterValues.asset_type = sp.get('type')!
+  if (!filterValues.condition_status && sp.get('condition')) filterValues.condition_status = sp.get('condition')!
+  if (!filterValues.assignment_status && sp.get('assignment')) filterValues.assignment_status = sp.get('assignment')!
   const filters = {
-    q: sp.get('q') || undefined, asset_type: sp.get('type') || undefined,
-    assignment_status: sp.get('assignment') || undefined, condition_status: sp.get('condition') || undefined,
-    location: sp.get('location') || undefined, deleted: sp.get('view') === 'trash' || undefined,
+    q: sp.get('q') || undefined, ...filterValues, deleted: sp.get('view') === 'trash' || undefined,
     page: Number(sp.get('page') || 1), page_size: pageSize, sort: sp.get('sort') || 'created_at', order: sp.get('order') || 'desc',
   }
+  const applyFilters = (next: AssetFilterValues) => {
+    const n = new URLSearchParams()
+    for (const k of ['q', 'view', 'sort', 'order']) { const v = sp.get(k); if (v) n.set(k, v) }
+    Object.entries(next).forEach(([k, v]) => { if (v) n.set(k, v) })
+    setSp(n, { replace: true }); setSelected([])
+  }
   const { data, isLoading, isFetching } = useAssets(filters)
-  const { data: ref } = useReference()
   const [selected, setSelected] = useState<number[]>([])
   const [dialog, setDialog] = useState<null | 'add' | 'import' | 'bulk'>(null)
   const [assignId, setAssignId] = useState<number | null>(null)
@@ -72,20 +81,7 @@ export default function Assets() {
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input className="pl-8" placeholder="Brand, model, serial, holder…" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => setParam('q', q.trim() || undefined)} />
         </form>
-        <Select className="w-auto" value={filters.asset_type ?? ''} onChange={(e) => setParam('type', e.target.value)} aria-label="Asset type">
-          <option value="">All types</option>{(ref?.asset_type ?? []).map((t) => <option key={t.id}>{t.name}</option>)}
-        </Select>
-        <Select className="w-auto" value={filters.assignment_status ?? ''} onChange={(e) => setParam('assignment', e.target.value)} aria-label="Assignment">
-          <option value="">Any assignment</option>{ASSIGNMENT_STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </Select>
-        <Select className="w-auto" value={filters.condition_status ?? ''} onChange={(e) => setParam('condition', e.target.value)} aria-label="Condition">
-          <option value="">Any condition</option>{CONDITION_STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </Select>
-        {(ref?.location?.length ?? 0) > 0 && (
-          <Select className="w-auto" value={filters.location ?? ''} onChange={(e) => setParam('location', e.target.value)} aria-label="Location">
-            <option value="">Any location</option>{ref!.location.map((l) => <option key={l.id}>{l.name}</option>)}
-          </Select>
-        )}
+        <AssetFilterBar values={filterValues} onChange={applyFilters} />
       </div>
 
       {selected.length > 0 && can('asset.edit') && !trash && (
@@ -99,13 +95,8 @@ export default function Assets() {
         </div>
       )}
 
-      <TableCard footer={<div className="flex flex-wrap items-center gap-3">
-        <TableFooterInfo shown={items.length} total={data?.total ?? 0} noun="assets" />
-        <div className="ml-auto flex items-center gap-3">
-          <RowsPerPageSelect value={pageSize} onChange={(n) => { setPageSize(n); setParam('page') }} />
-          <MiniPager page={filters.page} pages={data?.total_pages ?? 1} onPage={(p) => setParam('page', String(p))} />
-        </div>
-      </div>}>
+      <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="assets" page={filters.page} pages={data?.total_pages ?? 1}
+        onPage={(p) => setParam('page', String(p))} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setParam('page') }} />}>
         <TableScrollArea>
           {isLoading ? <p className="p-8 text-center text-sm text-gray-400">Loading assets…</p> : items.length === 0 ? (
             <EmptyState icon={<Laptop className="h-10 w-10" />} title={trash ? 'Trash is empty' : 'No assets match'}>

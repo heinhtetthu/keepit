@@ -15,7 +15,7 @@ export interface ComboOption {
 
 /** Searchable single-select dropdown. The list renders in a portal so modals
     and scroll areas never clip it; arrow keys + Enter work while typing. */
-export default function Combobox({ options, value, onChange, placeholder = 'Select…', searchPlaceholder = 'Search…', emptyText = 'No matches', allowCustom, className, autoOpen, disabled, hideSearch }: {
+export default function Combobox({ options, value, onChange, placeholder = 'Select…', searchPlaceholder = 'Search…', emptyText = 'No matches', allowCustom, className, autoOpen, disabled, hideSearch, compact }: {
   options: ComboOption[]
   value: string | null
   onChange: (value: string | null, custom?: boolean) => void
@@ -29,6 +29,8 @@ export default function Combobox({ options, value, onChange, placeholder = 'Sele
   disabled?: boolean
   /** Short fixed lists can skip the search box. */
   hideSearch?: boolean
+  /** Small inline picker (e.g. rows per page): no search, panel as wide as the button. */
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(!!autoOpen)
   const [q, setQ] = useState('')
@@ -105,12 +107,13 @@ export default function Combobox({ options, value, onChange, placeholder = 'Sele
       {open && rect && createPortal(
         <div
           ref={panel}
+          data-floating="true"
           tabIndex={-1}
           className="fixed z-[95] outline-none animate-pop-in overflow-hidden rounded-xl border bg-white shadow-pop"
-          style={{ left: Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 260) - 8)), width: Math.min(Math.max(rect.width, 260), window.innerWidth - 16), ...(below ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }) }}
+          style={{ left: Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, compact ? 72 : 260) - 8)), width: compact ? Math.max(rect.width, 72) : Math.min(Math.max(rect.width, 260), window.innerWidth - 16), ...(below ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }) }}
           onKeyDown={onKey}
         >
-          {!hideSearch && <div className="relative border-b">
+          {!hideSearch && !compact && <div className="relative border-b">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder={searchPlaceholder} className="h-10 w-full bg-transparent pl-9 pr-3 text-sm text-gray-900 outline-none" />
           </div>}

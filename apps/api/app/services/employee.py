@@ -9,7 +9,7 @@ from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeImportR
 from app.services.audit import log_audit
 
 
-EXTRA_FIELDS = {"username", "regions", "gender", "avatar_url", "join_date", "resignation_date"}
+EXTRA_FIELDS = {"username", "phone", "regions", "gender", "avatar_url", "join_date", "resignation_date"}
 
 
 def _serialize(e: Employee) -> dict[str, Any]:
@@ -21,6 +21,7 @@ def _serialize(e: Employee) -> dict[str, Any]:
         "title": e.title,
         "active": e.active,
         "username": e.username,
+        "phone": e.phone,
         "regions": e.regions or [],
         "gender": e.gender,
         "avatar_url": e.avatar_url,
@@ -55,6 +56,10 @@ async def _upsert(db: AsyncSession, data: EmployeeCreate) -> tuple[Employee, boo
         existing.business_units = data.resolved_business_units()
         existing.title = data.title
         existing.active = data.active
+        if data.phone:
+            existing.phone = data.phone
+        if data.join_date:
+            existing.join_date = data.join_date
         return existing, True
     employee = Employee(
         name=data.name.strip(),
@@ -62,6 +67,8 @@ async def _upsert(db: AsyncSession, data: EmployeeCreate) -> tuple[Employee, boo
         business_units=data.resolved_business_units(),
         title=data.title,
         active=data.active,
+        phone=data.phone,
+        join_date=data.join_date,
     )
     db.add(employee)
     return employee, False
@@ -121,6 +128,8 @@ COLUMN_CANDIDATES: dict[str, tuple[str, ...]] = {
     "email": ("email", "e-mail", "email address", "mail"),
     "business_units": ("business unit", "business_units", "business_unit", "bu", "unit", "department", "dept"),
     "title": ("title", "position", "job title", "role"),
+    "phone": ("phone", "phone number", "mobile", "tel", "telephone"),
+    "join_date": ("join date", "joined", "joined date", "start date", "hire date"),
 }
 
 
@@ -163,6 +172,19 @@ def _read_table_rows(filename: str, content: bytes) -> tuple[list[str], list[lis
     headers = non_empty[0]
     rows = [r for r in non_empty[1:] if any((c or "").strip() for c in r)]
     return headers, rows
+
+
+def _parse_date(v: str | None):
+    """Accept ISO (2024-03-01) or day/month/year; anything else is ignored."""
+    from datetime import datetime
+    if not v:
+        return None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(v.strip()[:10], fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _cell(row: list[str], idx: int | None) -> str | None:
@@ -210,6 +232,8 @@ async def import_employee_file(
             email=_cell(row, mapping["email"]) if mapping.get("email") is not None else None,
             business_units=[bus] if bus else [],
             title=_cell(row, mapping["title"]) if mapping.get("title") is not None else None,
+            phone=_cell(row, mapping.get("phone")),
+            join_date=_parse_date(_cell(row, mapping.get("join_date"))),
             active=True,
         )
 

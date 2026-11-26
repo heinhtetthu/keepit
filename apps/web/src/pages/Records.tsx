@@ -17,7 +17,7 @@ import type { RecordType, RecordItem, RecordField, SavedView } from '../types'
 import DynamicForm from '../components/DynamicForm'
 import DynamicTable, { useVisibleColumns, ColumnPicker } from '../components/DynamicTable'
 import SeatDialog, { BulkSeatDialog, seatOf, type SeatMode } from '../components/SeatDialog'
-import { TableCard, TableScrollArea, RowsPerPageSelect, MiniPager, TableFooterInfo, usePageSize } from '../components/table_shell'
+import { TableCard, TableScrollArea, usePageSize, TablePager } from '../components/table_shell'
 import { pushRecent } from '../store/recent'
 import { useViewMode, ViewSwitcher, Pager, VIEW_PAGE_SIZE } from '../components/ViewSwitcher'
 import { cn } from '@/lib/utils'
@@ -370,13 +370,8 @@ function RecordsOfType({ recordType }: { recordType: RecordType }) {
         <div className="space-y-2">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-12 rounded-lg bg-gray-100 animate-pulse" />)}</div>
       ) : (
         <TableCard className="flex-1 min-h-0" footer={
-          <>
-            <TableFooterInfo shown={recordsData?.items.length || 0} total={recordsData?.total || 0} noun="records" />
-            <div className="flex items-center gap-3">
-              <RowsPerPageSelect value={pageSize} onChange={(n) => { setPageSize(n); setPage(1) }} />
-              <MiniPager page={page} pages={recordsData?.total_pages || 1} onPage={setPage} />
-            </div>
-          </>
+          <TablePager shown={recordsData?.items.length || 0} total={recordsData?.total || 0} noun="records" page={page} pages={recordsData?.total_pages || 1} onPage={setPage}
+            pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />
         }>
           <TableScrollArea className="flex-1 overflow-x-hidden">
             <DynamicTable

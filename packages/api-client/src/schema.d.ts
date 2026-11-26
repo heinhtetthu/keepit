@@ -2193,6 +2193,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalog
+         * @description Asset reports this user can open.
+         */
+        get: operations["catalog_api_v1_reports_assets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/assets/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Report */
+        get: operations["run_report_api_v1_reports_assets__kind__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/forecast": {
         parameters: {
             query?: never;
@@ -3788,6 +3825,8 @@ export interface components {
             join_date?: string | null;
             /** Name */
             name: string;
+            /** Phone */
+            phone?: string | null;
             /** Regions */
             regions?: string[];
             /** Resignation Date */
@@ -3857,6 +3896,8 @@ export interface components {
             join_date?: string | null;
             /** Name */
             name: string;
+            /** Phone */
+            phone?: string | null;
             /**
              * Regions
              * @default []
@@ -3892,6 +3933,8 @@ export interface components {
             join_date?: string | null;
             /** Name */
             name?: string | null;
+            /** Phone */
+            phone?: string | null;
             /** Regions */
             regions?: string[] | null;
             /** Resignation Date */
@@ -5467,18 +5510,30 @@ export interface operations {
     list_assets_api_v1_assets_get: {
         parameters: {
             query?: {
-                q?: string | null;
-                asset_type?: string | null;
-                assignment_status?: string | null;
-                condition_status?: string | null;
-                employee_id?: number | null;
-                location?: string | null;
-                warranty_before?: string | null;
-                deleted?: boolean;
                 sort?: string;
                 order?: string;
                 page?: number;
                 page_size?: number;
+                q?: string | null;
+                asset_type?: string | null;
+                assignment_status?: string | null;
+                condition_status?: string | null;
+                location?: string | null;
+                brand?: string | null;
+                supplier?: string | null;
+                model?: string | null;
+                business_unit?: string | null;
+                employee_id?: number | null;
+                purchase_from?: string | null;
+                purchase_to?: string | null;
+                warranty_from?: string | null;
+                warranty_to?: string | null;
+                warranty_before?: string | null;
+                warranty?: ("active" | "expiring" | "expired" | "none") | null;
+                cost_min?: number | string | null;
+                cost_max?: number | string | null;
+                open_repair?: boolean | null;
+                deleted?: boolean;
             };
             header?: never;
             path?: never;
@@ -10243,6 +10298,81 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_api_v1_reports_assets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    run_report_api_v1_reports_assets__kind__get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                format?: string;
+                q?: string | null;
+                asset_type?: string | null;
+                assignment_status?: string | null;
+                condition_status?: string | null;
+                location?: string | null;
+                brand?: string | null;
+                supplier?: string | null;
+                model?: string | null;
+                business_unit?: string | null;
+                employee_id?: number | null;
+                purchase_from?: string | null;
+                purchase_to?: string | null;
+                warranty_from?: string | null;
+                warranty_to?: string | null;
+                warranty_before?: string | null;
+                warranty?: ("active" | "expiring" | "expired" | "none") | null;
+                cost_min?: number | string | null;
+                cost_max?: number | string | null;
+                open_repair?: boolean | null;
+                deleted?: boolean;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import RowMenu from '@/components/ui/menu'
 import { toast } from '@/components/ui/toaster'
-import { MiniPager, TableCard, TableFooterInfo, TableScrollArea, TH_STICKY } from '@/components/table_shell'
+import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
 import { BorrowDialog } from '@/components/assets/ActionDialogs'
 import { EmptyState, Tabs, useCan, useConfirm } from '@/components/assets/shared'
 
@@ -42,7 +42,8 @@ function Borrows({ q, page, setPage }: { q: string; page: number; setPage: (n: n
   const can = useCan()
   const [status, setStatus] = useState<'open' | 'overdue' | 'returned' | ''>('open')
   const [adding, setAdding] = useState(false)
-  const { data, isLoading } = useBorrows({ q: q || undefined, status: status || undefined, page, page_size: 50 })
+  const [pageSize, setPageSize] = usePageSize('borrows-page-size', 25)
+  const { data, isLoading } = useBorrows({ q: q || undefined, status: status || undefined, page, page_size: pageSize })
   const ret = useAssetMutation((a, id: number) => a.borrows.return(id))
   const del = useAssetMutation((a, id: number) => a.borrows.remove(id))
   const { confirm, dialog } = useConfirm()
@@ -55,7 +56,7 @@ function Borrows({ q, page, setPage }: { q: string; page: number; setPage: (n: n
         ))}
         {can('itlog.manage') && <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}><Plus className="mr-1.5 h-4 w-4" />Lend item</Button>}
       </div>
-      <TableCard footer={<div className="flex items-center"><TableFooterInfo shown={items.length} total={data?.total ?? 0} noun="entries" /><div className="ml-auto"><MiniPager page={page} pages={data?.total_pages ?? 1} onPage={setPage} /></div></div>}>
+      <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="entries" page={page} pages={data?.total_pages ?? 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
         <TableScrollArea>
           {isLoading ? <p className="p-6 text-center text-sm text-gray-400">Loading…</p> : !items.length ? <EmptyState title="Nothing here" /> : (
             <table className="w-full text-sm"><thead><tr><th className={th}>Item</th><th className={th}>Borrower</th><th className={th}>Borrowed</th><th className={th}>Due</th><th className={th}>Returned</th><th className={th} /></tr></thead>
@@ -82,10 +83,11 @@ function Borrows({ q, page, setPage }: { q: string; page: number; setPage: (n: n
 }
 
 function Repairs({ q, page, setPage }: { q: string; page: number; setPage: (n: number) => void }) {
-  const { data, isLoading } = useRepairLog({ q: q || undefined, page, page_size: 50 })
+  const [pageSize, setPageSize] = usePageSize('repairs-page-size', 25)
+  const { data, isLoading } = useRepairLog({ q: q || undefined, page, page_size: pageSize })
   const items = data?.items ?? []
   return (
-    <TableCard footer={<div className="flex items-center"><TableFooterInfo shown={items.length} total={data?.total ?? 0} noun="repairs" /><div className="ml-auto"><MiniPager page={page} pages={data?.total_pages ?? 1} onPage={setPage} /></div></div>}>
+    <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="repairs" page={page} pages={data?.total_pages ?? 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
       <TableScrollArea>
         {isLoading ? <p className="p-6 text-center text-sm text-gray-400">Loading…</p> : !items.length ? <EmptyState title="No repairs logged" /> : (
           <table className="w-full text-sm"><thead><tr><th className={th}>Date</th><th className={th}>Asset</th><th className={th}>Issue</th><th className={th}>Vendor</th><th className={th}>Cost</th><th className={th}>Status</th></tr></thead>
@@ -100,10 +102,11 @@ function Repairs({ q, page, setPage }: { q: string; page: number; setPage: (n: n
 }
 
 function MaintenanceLog({ q, page, setPage }: { q: string; page: number; setPage: (n: number) => void }) {
-  const { data, isLoading } = useMaintenanceLog({ q: q || undefined, page, page_size: 50 })
+  const [pageSize, setPageSize] = usePageSize('maintenance-page-size', 25)
+  const { data, isLoading } = useMaintenanceLog({ q: q || undefined, page, page_size: pageSize })
   const items = data?.items ?? []
   return (
-    <TableCard footer={<div className="flex items-center"><TableFooterInfo shown={items.length} total={data?.total ?? 0} noun="entries" /><div className="ml-auto"><MiniPager page={page} pages={data?.total_pages ?? 1} onPage={setPage} /></div></div>}>
+    <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="entries" page={page} pages={data?.total_pages ?? 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
       <TableScrollArea>
         {isLoading ? <p className="p-6 text-center text-sm text-gray-400">Loading…</p> : !items.length ? <EmptyState title="No maintenance logged" /> : (
           <table className="w-full text-sm"><thead><tr><th className={th}>Date</th><th className={th}>Asset</th><th className={th}>Body</th><th className={th}>OS</th><th className={th}>Issues found</th></tr></thead>

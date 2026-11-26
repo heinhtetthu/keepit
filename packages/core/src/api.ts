@@ -83,6 +83,12 @@ export function createApi(t: Transport) {
       offboard: (id: number, body: T.OffboardRequest) => post<T.OffboardResult>(`/employees/${id}/offboard`, body),
     },
     dashboard: { assets: () => get<T.AssetSummary>('/dashboard/assets') },
+    reports: {
+      assetCatalog: () => get<{ kind: T.AssetReportKind; title: string }[]>('/reports/assets'),
+      asset: (kind: T.AssetReportKind, params: QueryParams = {}) => get<T.AssetReport>(`/reports/assets/${kind}`, params),
+      assetCsv: (kind: T.AssetReportKind, params: QueryParams = {}) =>
+        t.request<Blob>('GET', `/reports/assets/${kind}`, { params: { ...params, format: 'csv' }, responseType: 'blob' }),
+    },
     search: { all: (q: string) => get<{ results: T.SearchHit[] }>('/search/all', { q }) },
     settings: {
       currency: () => get<T.CurrencySettings>('/settings/currency'),

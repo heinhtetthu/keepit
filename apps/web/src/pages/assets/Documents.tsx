@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import RowMenu from '@/components/ui/menu'
 import Modal from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
-import { MiniPager, TableCard, TableFooterInfo, TableScrollArea, TH_STICKY } from '@/components/table_shell'
+import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
 import { EmptyState, Field, useCan, useConfirm } from '@/components/assets/shared'
 import { DownloadButton, PreviewDialog, UploadDialog } from '@/components/documents/DocumentDialogs'
 import ExtractionDialog from '@/components/documents/ExtractionDialog'
@@ -25,7 +25,8 @@ export default function Documents() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useDocuments({ q: search || undefined, category: category || undefined, page, page_size: 50 })
+  const [pageSize, setPageSize] = usePageSize('documents-page-size', 25)
+  const { data, isLoading } = useDocuments({ q: search || undefined, category: category || undefined, page, page_size: pageSize })
   const [upload, setUpload] = useState(false)
   const [preview, setPreview] = useState<Document | null>(null)
   const [extract, setExtract] = useState<Document | null>(null)
@@ -54,7 +55,7 @@ export default function Documents() {
           <option value="">All categories</option>{DOCUMENT_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
         </Select>
       </div>
-      <TableCard footer={<div className="flex items-center"><TableFooterInfo shown={items.length} total={data?.total ?? 0} noun="documents" /><div className="ml-auto"><MiniPager page={page} pages={data?.total_pages ?? 1} onPage={setPage} /></div></div>}>
+      <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="documents" page={page} pages={data?.total_pages ?? 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
         <TableScrollArea>
           {isLoading ? <p className="p-6 text-center text-sm text-gray-400">Loading…</p> : !items.length ? <EmptyState icon={<FileText className="h-10 w-10" />} title="No documents" /> : (
             <table className="w-full text-sm"><thead><tr><th className={th}>Title</th><th className={th}>Category</th><th className={th}>Expires</th><th className={th}>Size</th><th className={th}>Uploaded</th><th className={th} /></tr></thead>

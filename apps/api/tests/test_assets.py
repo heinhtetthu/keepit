@@ -222,3 +222,36 @@ async def test_split_access_per_type(client):
     assert (await client.post("/api/v1/assets", json={"asset_type": "Laptop"}, headers=mh)).status_code == 403
     # Only system administrators may change access
     assert (await client.put(f"/api/v1/users/{u['id']}/access", json={"records": "manager"}, headers=mh)).status_code == 403
+
+
+async def test_asset_filters_and_reports(client):
+    h = await _login(client)
+    emp = await _employee(client, h, name="Ko Ko", business_units=["Finance"], phone="+95 9 123", join_date="2023-04-01")
+    assert emp["phone"] == "+95 9 123" and emp["join_date"] == "2023-04-01"
+    a = await _asset(client, h, employee_id=emp["id"], purchase_cost="900", supplier="Shop A")
+    b = await _asset(client, h, serial_number="SN-2", asset_type="Monitor", brand="LG", model="27UL",
+                     warranty_end_date=(TODAY - timedelta(days=5)).isoformat(), supplier="Shop B")
+    await client.post(f"/api/v1/assets/{a['id']}/repairs", json={"repair_date": TODAY.isoformat(), "issue": "Fan", "cost": "40", "vendor": "Fixit"}, headers=h)
+    q = lambda **p: client.get("/api/v1/assets", params=p, headers=h)
+    assert (await q(asset_type="Laptop,Monitor")).json()["total"] == 2
+    assert (await q(brand="LG")).json()["total"] == 1
+    assert (await q(business_unit="Finance")).json()["total"] == 1
+    assert (await q(supplier="Shop A")).json()["total"] == 1
+    assert (await q(cost_min="500")).json()["total"] == 1
+    assert (await q(warranty="expired")).json()["items"][0]["id"] == b["id"]
+    assert (await q(warranty="expiring")).json()["items"][0]["id"] == a["id"]
+    assert (await q(open_repair="true")).json()["items"][0]["id"] == a["id"]
+    assert (await q(purchase_from="2025-01-01", purchase_to="2025-12-31")).json()["total"] == 2
+    cat = (await client.get("/api/v1/reports/assets", headers=h)).json()
+    assert {c["kind"] for c in cat} == {"inventory", "repairs", "maintenance", "borrows", "warranties", "holders"}
+    inv = (await client.get("/api/v1/reports/assets/inventory", params={"asset_type": "Laptop"}, headers=h)).json()
+    assert inv["summary"][0] == {"label": "Assets", "value": 1} and inv["rows"][0]["business_unit"] == "Finance"
+    rep = (await client.get("/api/v1/reports/assets/repairs", headers=h)).json()
+    assert rep["rows"][0]["vendor"] == "Fixit" and {"label": "Total cost", "value": 40.0} in rep["summary"]
+    war = (await client.get("/api/v1/reports/assets/warranties", headers=h)).json()
+    assert {r["state"] for r in war["rows"]} == {"Expired", "Within 30 days"}
+    hold = (await client.get("/api/v1/reports/assets/holders", headers=h)).json()
+    assert hold["rows"][0]["employee"] == "Ko Ko" and hold["rows"][0]["count"] == 1
+    csv_resp = await client.get("/api/v1/reports/assets/inventory", params={"format": "csv"}, headers=h)
+    assert csv_resp.headers["content-type"].startswith("text/csv") and csv_resp.text.splitlines()[0].startswith("Asset,Type")
+    assert (await client.get("/api/v1/reports/assets/nope", headers=h)).status_code == 404
