@@ -90,7 +90,7 @@ function describe(field: RecordField | undefined, slug: string, v: any): string 
 }
 
 /** Removable chips for the filters in effect, shown under the toolbar. */
-export function ActiveFilters({ fields, value, onChange }: { fields: RecordField[]; value: FilterState; onChange: (f: FilterState) => void }) {
+export function ActiveFilters({ fields, value, onChange, simple }: { fields: RecordField[]; value: FilterState; onChange: (f: FilterState) => void; simple?: boolean }) {
   const entries = Object.entries(value).filter(([k, v]) => !isMeta(k) && isSet(v))
   if (!entries.length) return null
   return (
@@ -105,7 +105,7 @@ export function ActiveFilters({ fields, value, onChange }: { fields: RecordField
           ><X className="h-3.5 w-3.5" /></button>
         </span>
       ))}
-      {entries.length > 1 && (
+      {entries.length > 1 && !simple && (
         <button
           className="rounded-full px-2 py-1 text-xs text-gray-500 hover:text-gray-900"
           onClick={() => onChange(value.__logic === 'or' ? { ...value, __logic: 'and' } : { ...value, __logic: 'or' })}
@@ -119,10 +119,12 @@ export function ActiveFilters({ fields, value, onChange }: { fields: RecordField
   )
 }
 
-export default function FilterButton({ fields, value, onChange, showRenewed }: {
+export default function FilterButton({ fields, value, onChange, showRenewed, simple }: {
   fields: RecordField[]
   value: FilterState
   onChange: (f: FilterState) => void
+  /** Plain AND filters with no "is empty" options (lists whose API has fixed filters, like assets). */
+  simple?: boolean
   /** Offer the "Renewed recently" section (types with an expiry field). */
   showRenewed?: boolean
 }) {
@@ -135,12 +137,13 @@ export default function FilterButton({ fields, value, onChange, showRenewed }: {
         <span className="hidden sm:inline">Filters</span>
         {count > 0 && <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{count}</span>}
       </Button>
-      {open && <FilterPanel fields={fields} value={value} showRenewed={showRenewed} onClose={() => setOpen(false)} onApply={(f) => { onChange(f); setOpen(false) }} />}
+      {open && <FilterPanel fields={fields} value={value} showRenewed={showRenewed} simple={simple} onClose={() => setOpen(false)} onApply={(f) => { onChange(f); setOpen(false) }} />}
     </>
   )
 }
 
-function FilterPanel({ fields, value, onApply, onClose, showRenewed }: {
+function FilterPanel({ fields, value, onApply, onClose, showRenewed, simple }: {
+  simple?: boolean
   fields: RecordField[]
   value: FilterState
   onApply: (f: FilterState) => void
@@ -199,12 +202,12 @@ function FilterPanel({ fields, value, onApply, onClose, showRenewed }: {
             </Section>
           )}
           {shown.map((f) => (
-            <FieldSection key={f.id} field={f} value={draft[f.slug]} onChange={(v) => set(f.slug, v)} />
+            <FieldSection key={f.id} field={f} value={draft[f.slug]} simple={simple} onChange={(v) => set(f.slug, v)} />
           ))}
           {!shown.length && <p className="px-5 py-10 text-center text-sm text-gray-400">No fields match.</p>}
         </div>
         <footer className="flex items-center gap-2 border-t bg-gray-50 px-5 py-3">
-          {filterCount(draft) > 1 && (
+          {filterCount(draft) > 1 && !simple && (
             <div className="mr-auto flex rounded-md border bg-white p-0.5 text-xs">
               {(['and', 'or'] as const).map((m) => (
                 <button key={m} onClick={() => setDraft({ ...draft, __logic: m })} className={cn('rounded px-2 py-1', (draft.__logic ?? 'and') === m ? 'bg-gray-900 text-white' : 'text-gray-500')}>
@@ -213,7 +216,7 @@ function FilterPanel({ fields, value, onApply, onClose, showRenewed }: {
               ))}
             </div>
           )}
-          <Button variant="ghost" className={cn(filterCount(draft) <= 1 && 'mr-auto')} onClick={() => setDraft({})}>Clear all</Button>
+          <Button variant="ghost" className={cn((filterCount(draft) <= 1 || simple) && 'mr-auto')} onClick={() => setDraft({})}>Clear all</Button>
           <Button onClick={() => onApply(draft)}>Show results</Button>
         </footer>
       </aside>
@@ -245,7 +248,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   )
 }
 
-function FieldSection({ field, value, onChange }: { field: RecordField; value: any; onChange: (v: unknown) => void }) {
+function FieldSection({ field, value, onChange, simple }: { field: RecordField; value: any; onChange: (v: unknown) => void; simple?: boolean }) {
   const kind = KIND[field.field_type]
   const emptyMode = value?.isEmpty ? 'empty' : value?.notEmpty ? 'set' : null
   const options = useChoiceOptions(field, kind === 'choice')
@@ -331,7 +334,7 @@ function FieldSection({ field, value, onChange }: { field: RecordField; value: a
   return (
     <Section title={field.name} active={isSet(value)} onClear={() => onChange(null)}>
       {control}
-      {kind !== 'boolean' && emptyToggles}
+      {kind !== 'boolean' && !simple && emptyToggles}
     </Section>
   )
 }

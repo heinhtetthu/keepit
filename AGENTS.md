@@ -7,7 +7,7 @@ Keepit is a renewals and IT-asset management app: a FastAPI + PostgreSQL + React
 1. **Never commit secrets.** `.env` and `apps/api/.env` are git-ignored; `.env.example` shows the shape.
 2. **Commit only when asked.**
 3. Match existing conventions. Check `package.json` / `requirements.txt` before adding a library.
-4. Migrations are append-only (head: `0004_employee_phone`). Use `alembic revision --autogenerate` and keep `alembic check` clean.
+4. Migrations are append-only (head: `0006_remove_extraction`). Use `alembic revision --autogenerate` and keep `alembic check` clean.
 5. `Mapped["X"]` annotations cause 8 known ruff F821 false positives. Gate with `ruff check app tests --select F401,F811,E9`.
 
 ## Layout
@@ -15,7 +15,7 @@ Keepit is a renewals and IT-asset management app: a FastAPI + PostgreSQL + React
 | Path | What |
 |---|---|
 | `apps/api/app/api/v1/*` | Routers. Permission checks: `Depends(require_permission("x.y"))`, `require_superuser`, `require_any_permission` |
-| `apps/api/app/services/*` | Business logic: `access.py` (record-type visibility/edit), `access_levels.py` (role catalogue), `asset.py`, `document.py`, `extraction/*`, `ai.py`, `record.py`, `assignment.py`, `reminder.py`, `audit.py` |
+| `apps/api/app/services/*` | Business logic: `access.py` (record-type visibility/edit), `access_levels.py` (role catalogue), `asset.py`, `document.py`, `ai.py`, `record.py`, `assignment.py`, `reminder.py`, `audit.py` |
 | `apps/api/app/db/rls.py` + `session.py` | Row-level security policies and per-request context (`set_rls_context`) |
 | `apps/web/src` | Pages, components, `lib/branding.tsx` (runtime brand colour/logo), `store/*` (zustand) |
 | `packages/core` | Platform-neutral API map + React Query hooks (no DOM APIs, so mobile can reuse it) |

@@ -270,6 +270,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asset Summary */
+        get: operations["asset_summary_api_v1_assets_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/templates": {
         parameters: {
             query?: never;
@@ -1089,75 +1106,6 @@ export interface paths {
          * @description Offboarding: unassign all of the employee's seats (they stay unassigned).
          */
         post: operations["release_employee_api_v1_employees__employee_id__release_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/extraction/doc-types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Doc Types */
-        get: operations["doc_types_api_v1_extraction_doc_types_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/extraction/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Runs */
-        get: operations["runs_api_v1_extraction_runs_get"];
-        put?: never;
-        /** Run */
-        post: operations["run_api_v1_extraction_runs_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/extraction/runs/{run_id}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirm */
-        post: operations["confirm_api_v1_extraction_runs__run_id__confirm_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/extraction/runs/{run_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject */
-        post: operations["reject_api_v1_extraction_runs__run_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3188,6 +3136,26 @@ export interface components {
             /** Warranty End Date */
             warranty_end_date?: string | null;
         };
+        /**
+         * AssetTabCounts
+         * @description Counts for the preset tabs on the asset list (written-off assets are only in written_off).
+         */
+        AssetTabCounts: {
+            /** Assigned */
+            assigned: number;
+            /** Available */
+            available: number;
+            /** Borrowed */
+            borrowed: number;
+            /** In Repair */
+            in_repair: number;
+            /** Total */
+            total: number;
+            /** Warranty Expiring */
+            warranty_expiring: number;
+            /** Written Off */
+            written_off: number;
+        };
         /** AssetUpdate */
         AssetUpdate: {
             /** Asset Type */
@@ -3627,13 +3595,6 @@ export interface components {
             notes?: string | null;
             /** Status */
             status: string;
-        };
-        /** ConfirmRequest */
-        ConfirmRequest: {
-            /** Target */
-            target?: Record<string, never>;
-            /** Values */
-            values?: Record<string, never>;
         };
         /** CurrencySettings */
         CurrencySettings: {
@@ -5096,13 +5057,6 @@ export interface components {
             /** Permission Ids */
             permission_ids?: number[] | null;
         };
-        /** RunRequest */
-        RunRequest: {
-            /** Doc Type */
-            doc_type: string;
-            /** Document Id */
-            document_id: number;
-        };
         /** SavedViewCreate */
         SavedViewCreate: {
             /** Filters */
@@ -5111,6 +5065,12 @@ export interface components {
             name: string;
             /** Record Type Id */
             record_type_id?: number | null;
+            /**
+             * Scope
+             * @default records
+             * @enum {string}
+             */
+            scope: "records" | "assets";
             /** Sort */
             sort?: Record<string, never> | null;
             /** Visible Columns */
@@ -5126,6 +5086,11 @@ export interface components {
             name: string;
             /** Record Type Id */
             record_type_id: number | null;
+            /**
+             * Scope
+             * @default records
+             */
+            scope: string;
             /** Sort */
             sort: Record<string, never> | null;
             /** Visible Columns */
@@ -5524,15 +5489,17 @@ export interface operations {
                 model?: string | null;
                 business_unit?: string | null;
                 employee_id?: number | null;
+                employee_ids?: string | null;
                 purchase_from?: string | null;
                 purchase_to?: string | null;
                 warranty_from?: string | null;
                 warranty_to?: string | null;
                 warranty_before?: string | null;
-                warranty?: ("active" | "expiring" | "expired" | "none") | null;
+                warranty?: string | null;
                 cost_min?: number | string | null;
                 cost_max?: number | string | null;
                 open_repair?: boolean | null;
+                hide_written_off?: boolean;
                 deleted?: boolean;
             };
             header?: never;
@@ -5940,6 +5907,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    asset_summary_api_v1_assets_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetTabCounts"];
                 };
             };
         };
@@ -7829,154 +7816,6 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    doc_types_api_v1_extraction_doc_types_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    runs_api_v1_extraction_runs_get: {
-        parameters: {
-            query: {
-                document_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_api_v1_extraction_runs_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RunRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_api_v1_extraction_runs__run_id__confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConfirmRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_api_v1_extraction_runs__run_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -10358,15 +10197,17 @@ export interface operations {
                 model?: string | null;
                 business_unit?: string | null;
                 employee_id?: number | null;
+                employee_ids?: string | null;
                 purchase_from?: string | null;
                 purchase_to?: string | null;
                 warranty_from?: string | null;
                 warranty_to?: string | null;
                 warranty_before?: string | null;
-                warranty?: ("active" | "expiring" | "expired" | "none") | null;
+                warranty?: string | null;
                 cost_min?: number | string | null;
                 cost_max?: number | string | null;
                 open_repair?: boolean | null;
+                hide_written_off?: boolean;
                 deleted?: boolean;
             };
             header?: never;
@@ -11857,6 +11698,7 @@ export interface operations {
         parameters: {
             query?: {
                 record_type_id?: number | null;
+                scope?: "records" | "assets";
             };
             header?: never;
             path?: never;

@@ -40,10 +40,10 @@ export default function Popover({ trigger, children, align = 'left', panelClassN
       if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[data-floating="true"]')) return
       setOpen(false)
     }
-    document.addEventListener('mousedown', onClick)
+    document.addEventListener('mousedown', onClick, true)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('mousedown', onClick, true)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])

@@ -328,13 +328,27 @@ class AssetFilters(BaseModel):
     model: str | None = Field(default=None, max_length=200)
     business_unit: str | None = Field(default=None, max_length=1000)
     employee_id: int | None = None
+    employee_ids: str | None = Field(default=None, max_length=2000, description="Comma-separated employee ids")
     purchase_from: date | None = None
     purchase_to: date | None = None
     warranty_from: date | None = None
     warranty_to: date | None = None
     warranty_before: date | None = None
-    warranty: Literal["active", "expiring", "expired", "none"] | None = None
+    warranty: str | None = Field(default=None, max_length=100, pattern=r"^[a-z,]*$",
+                                 description="Comma-separated: active, expiring (90 days), expired, none")
     cost_min: Decimal | None = Field(default=None, ge=0)
     cost_max: Decimal | None = Field(default=None, ge=0)
     open_repair: bool | None = None
+    hide_written_off: bool = False
     deleted: bool = False
+
+
+class AssetTabCounts(BaseModel):
+    """Counts for the preset tabs on the asset list (written-off assets are only in written_off)."""
+    total: int
+    assigned: int
+    available: int
+    borrowed: int
+    in_repair: int
+    warranty_expiring: int
+    written_off: int

@@ -16,7 +16,7 @@ Applies to every asset; there is no per-asset limit.
 |---|---|---|
 | No access | Nothing on the asset side | See any asset |
 | Viewer | Browse assets and their history, IT logs, documents, the employee directory | Add, edit, assign, lend, upload or delete |
-| Editor | Viewer, plus add/edit/import assets, assign/reassign/retire, log repairs/maintenance/borrows, upload/edit documents, run AI extraction | Delete or restore, manage employees, change asset configuration |
+| Editor | Viewer, plus add/edit/import assets, assign/reassign/retire, log repairs/maintenance/borrows, upload/edit documents | Delete or restore, manage employees, change asset configuration |
 | Manager | Editor, plus delete/restore assets and documents, manage employees and offboarding, edit asset lists/templates/auto numbers | Manage users or workspace settings |
 
 ## Records level + record-type grants
@@ -50,4 +50,4 @@ The level sets the **most** a person may do. Each record type is then Hidden, Vi
 
 ## Permission strings
 
-`record.*`, `record_type.*`, `field.*`, `report.view|export`, `reminder.*`, `notification.view`, `user.*`, `settings.view|edit`, `employee.view|manage`, `asset.view|create|edit|delete`, `itlog.view|manage`, `document.view|upload|edit|delete`, `extraction.run`, `reference.manage`, `assistant.use`. Audit logs are restricted to system administrators.
+`record.*`, `record_type.*`, `field.*`, `report.view|export`, `reminder.*`, `notification.view`, `user.*`, `settings.view|edit`, `employee.view|manage`, `asset.view|create|edit|delete`, `itlog.view|manage`, `document.view|upload|edit|delete`, `reference.manage`, `assistant.use`. Audit logs are restricted to system administrators.

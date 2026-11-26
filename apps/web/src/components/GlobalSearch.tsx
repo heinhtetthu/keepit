@@ -52,10 +52,10 @@ export default function GlobalSearch({ className, autoFocus }: { className?: str
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onClick)
+    document.addEventListener('mousedown', onClick, true)
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('mousedown', onClick, true)
     }
   }, [])
 

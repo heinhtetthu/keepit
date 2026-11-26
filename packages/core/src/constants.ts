@@ -29,6 +29,6 @@ export const PERMISSIONS = {
   assetView: 'asset.view', assetCreate: 'asset.create', assetEdit: 'asset.edit', assetDelete: 'asset.delete',
   itlogView: 'itlog.view', itlogManage: 'itlog.manage',
   documentView: 'document.view', documentUpload: 'document.upload', documentEdit: 'document.edit', documentDelete: 'document.delete',
-  extractionRun: 'extraction.run', referenceManage: 'reference.manage',
+  referenceManage: 'reference.manage',
   employeeView: 'employee.view', employeeManage: 'employee.manage', recordView: 'record.view', recordEdit: 'record.edit',
 } as const

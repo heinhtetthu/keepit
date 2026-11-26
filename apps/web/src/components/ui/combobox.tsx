@@ -36,7 +36,7 @@ export default function Combobox({ options, value, onChange, placeholder = 'Sele
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
-  const btn = useRef<HTMLButtonElement>(null)
+  const btn = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
 
@@ -65,8 +65,8 @@ export default function Combobox({ options, value, onChange, placeholder = 'Sele
       if (panel.current?.contains(e.target as Node) || btn.current?.contains(e.target as Node)) return
       setOpen(false)
     }
-    document.addEventListener('mousedown', away)
-    return () => document.removeEventListener('mousedown', away)
+    document.addEventListener('mousedown', away, true)
+    return () => document.removeEventListener('mousedown', away, true)
   }, [open])
 
   useEffect(() => { setActive(0) }, [needle])
@@ -76,34 +76,43 @@ export default function Combobox({ options, value, onChange, placeholder = 'Sele
     else if (shown[i]) onChange(shown[i].value)
     setOpen(false)
     setQ('')
+    btn.current?.focus()
   }
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(rows - 1, a + 1)) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)) }
     else if (e.key === 'Enter') { e.preventDefault(); if (rows) pick(active) }
-    else if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) }
+    else if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); setOpen(false); btn.current?.focus() }
   }
 
   const below = rect ? window.innerHeight - rect.bottom > 300 || rect.top < 300 : true
   return (
     <>
-      <button
+      {/* A div with role="combobox", not a <button>: a surrounding <label> forwards clicks to the
+          first button inside it, which re-opened the list right after an outside click closed it. */}
+      <div
         ref={btn}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        disabled={disabled}
-        className={cn(fieldClass, 'items-center gap-2.5 pl-3 pr-2.5 text-left', open && 'border-primary shadow-glow', className)}
+        role="combobox"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled || undefined}
+        onClick={() => { if (!disabled) setOpen((o) => !o) }}
+        onKeyDown={(e) => {
+          if (disabled || open) return
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); setOpen(true) }
+        }}
+        className={cn(fieldClass, 'cursor-pointer select-none items-center text-left outline-none focus-visible:border-primary focus-visible:shadow-glow',
+          compact ? 'gap-1 pl-2.5 pr-1.5' : 'gap-2.5 pl-3 pr-2.5', disabled && 'pointer-events-none opacity-50', open && 'border-primary shadow-glow', className)}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         {selected?.leading}
-        <span className="min-w-0 flex-1 truncate">
+        <span className={cn('min-w-0 flex-1', compact ? 'whitespace-nowrap tabular-nums' : 'truncate')}>
           {selected ? <>{selected.label}{selected.sublabel && <span className="text-gray-400"> · {selected.sublabel}</span>}</>
             : value ? value : <span className="text-gray-400">{placeholder}</span>}
         </span>
-        <ChevronDown className={cn('ml-1 h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200', open && 'rotate-180 text-primary')} />
-      </button>
+        <ChevronDown className={cn('shrink-0 text-gray-400 transition-transform duration-200', compact ? 'h-3.5 w-3.5' : 'ml-1 h-4 w-4', open && 'rotate-180 text-primary')} />
+      </div>
       {open && rect && createPortal(
         <div
           ref={panel}

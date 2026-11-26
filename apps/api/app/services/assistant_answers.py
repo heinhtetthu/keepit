@@ -37,7 +37,7 @@ def guide_answer(question, user):
     topics = [
         ('passkeys', r'passkey|forgot.*password|reset.*password|api token|\bmcp\b'),
         ('itlogs', r'\b(borrow\w*|lend\w*|repair\w*|maintenance|it logs?)\b'),
-        ('documents', r'document|upload|extract\w*|invoice'),
+        ('documents', r'document|upload|invoice'),
         ('assign', r'offboard\w*|quick assign|assign\w* (an |the )?(asset|laptop|device)|new hire'),
         ('people', r'employee 360|employee profile|employee directory'),
         ('assets', r'\b(assets?|laptops?|devices?|qr|serial|spec template|auto number)\b'),

@@ -1,4 +1,4 @@
-"""One client for every AI feature (assistant chat + document extraction).
+"""AI client for the assistant chat.
 
 Talks to any OpenAI-compatible /chat/completions endpoint. Config comes from
 Settings > Assistant (system_settings: ai_base_url, ai_model, ai_api_key

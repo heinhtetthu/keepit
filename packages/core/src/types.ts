@@ -2,6 +2,7 @@ import type { Schemas } from '@workspace/api-client'
 
 export type Asset = Schemas['AssetResponse']
 export type AssetDetail = Schemas['AssetDetailResponse']
+export type AssetTabCounts = Schemas['AssetTabCounts']
 export type AssetCreate = Schemas['AssetCreate']
 export type AssetUpdate = Schemas['AssetUpdate']
 export type Repair = Schemas['RepairResponse']
@@ -51,14 +52,6 @@ export interface AssetSummary {
 
 export interface SearchHit { kind: 'type' | 'record' | 'asset' | 'employee' | 'document'; title: string; subtitle?: string; url: string; id?: number; icon?: string | null }
 
-export interface ExtractionField { key: string; label: string; kind: 'text' | 'date' | 'currency' | 'number' | 'enum'; hint?: string | null; enum: string[]; save?: string | null }
-export interface ExtractionDocType { key: string; label: string; fields: ExtractionField[]; row_based: boolean }
-export interface ExtractionRun {
-  id: number; document_id: number; doc_type: string; status: 'success' | 'failed' | 'confirmed' | 'rejected'
-  model?: string | null; error?: string | null; extracted_at: string; confirmed_at?: string | null
-  result?: { fields?: Record<string, string | null>; rows?: Record<string, string | null>[]; confidence: Record<string, number>; notes: string } | null
-  target?: Record<string, unknown> | null
-}
 export interface CurrencySettings { default_currency: string; rates: Record<string, number> }
 
 export type AssetReportKind = 'inventory' | 'repairs' | 'maintenance' | 'borrows' | 'warranties' | 'holders'

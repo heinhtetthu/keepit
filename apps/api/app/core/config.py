@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     S3_SECRET_ACCESS_KEY: str = ""
     MAX_DOCUMENT_BYTES: int = 10 * 1024 * 1024
 
-    # AI extraction + assistant: any OpenAI-compatible chat completions endpoint.
+    # AI assistant: any OpenAI-compatible chat completions endpoint.
     # Admins can override these in Settings (stored in system_settings).
     AI_BASE_URL: str = "https://api.openai.com/v1"
     AI_API_KEY: str = ""

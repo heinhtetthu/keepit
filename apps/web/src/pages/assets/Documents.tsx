@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { FileText, Search, Sparkles, Upload } from 'lucide-react'
+import { FileText, Search, Upload } from 'lucide-react'
 import { DOCUMENT_CATEGORIES, errorMessage, formatBytes, formatDate, daysUntil, useApi, useAssetMutation, useDocuments, type Document } from '@workspace/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,6 @@ import { toast } from '@/components/ui/toaster'
 import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
 import { EmptyState, Field, useCan, useConfirm } from '@/components/assets/shared'
 import { DownloadButton, PreviewDialog, UploadDialog } from '@/components/documents/DocumentDialogs'
-import ExtractionDialog from '@/components/documents/ExtractionDialog'
 
 const th = `${TH_STICKY} px-3 py-2 text-left text-xs font-medium text-gray-500`
 const LINK_PATH: Record<string, (id: number) => string> = { asset: (id) => `/assets/${id}`, employee: (id) => `/employees/${id}`, borrow: () => '/it-logs' }
@@ -29,7 +28,6 @@ export default function Documents() {
   const { data, isLoading } = useDocuments({ q: search || undefined, category: category || undefined, page, page_size: pageSize })
   const [upload, setUpload] = useState(false)
   const [preview, setPreview] = useState<Document | null>(null)
-  const [extract, setExtract] = useState<Document | null>(null)
   const [edit, setEdit] = useState<Document | null>(null)
   const del = useAssetMutation((a, id: number) => a.documents.remove(id))
   const { confirm, dialog } = useConfirm()
@@ -73,7 +71,6 @@ export default function Documents() {
                       <DownloadButton doc={d} variant="ghost" />
                       <RowMenu items={[
                         { label: 'Preview', onSelect: () => setPreview(d) },
-                        { label: 'Extract with AI', icon: <Sparkles className="h-4 w-4" />, onSelect: () => setExtract(d), hidden: !can('extraction.run') },
                         { label: 'Edit details & links', onSelect: () => setEdit(d), hidden: !can('document.edit') },
                         { label: 'Delete', danger: true, divider: true, hidden: !can('document.delete'), onSelect: () => confirm('Delete document', `Delete “${d.title}”?`, () => del.mutateAsync(d.id), 'Delete') },
                       ]} />
@@ -84,9 +81,8 @@ export default function Documents() {
           )}
         </TableScrollArea>
       </TableCard>
-      {upload && <UploadDialog onClose={() => setUpload(false)} onUploaded={(d) => can('extraction.run') && ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain', 'text/csv'].includes(d.mime_type) && setExtract(d)} />}
+      {upload && <UploadDialog onClose={() => setUpload(false)} />}
       {preview && <PreviewDialog doc={preview} onClose={() => setPreview(null)} />}
-      {extract && <ExtractionDialog doc={extract} onClose={() => setExtract(null)} />}
       {edit && <EditDialog doc={edit} onClose={() => setEdit(null)} />}
       {dialog}
     </div>

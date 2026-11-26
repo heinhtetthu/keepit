@@ -12,6 +12,7 @@ export function createApi(t: Transport) {
   return {
     assets: {
       list: (params: QueryParams = {}) => get<T.Page<T.Asset>>('/assets', params),
+      tabCounts: () => get<T.AssetTabCounts>('/assets/summary'),
       get: (id: number) => get<T.AssetDetail>(`/assets/${id}`),
       create: (body: T.AssetCreate) => post<T.Asset>('/assets', body),
       update: (id: number, body: T.AssetUpdate) => patch<T.Asset>(`/assets/${id}`, body),
@@ -62,14 +63,6 @@ export function createApi(t: Transport) {
       remove: (id: number) => del(`/documents/${id}`),
       restore: (id: number) => post<T.Document>(`/documents/${id}/restore`),
       file: (id: number, download = false) => t.request<Blob>('GET', `/documents/${id}/file`, { params: { download }, responseType: 'blob' }),
-    },
-    extraction: {
-      docTypes: () => get<T.ExtractionDocType[]>('/extraction/doc-types'),
-      runs: (document_id: number) => get<T.ExtractionRun[]>('/extraction/runs', { document_id }),
-      run: (document_id: number, doc_type: string) => post<T.ExtractionRun>('/extraction/runs', { document_id, doc_type }),
-      confirm: (runId: number, values: Record<string, unknown>, target: Record<string, unknown>) =>
-        post<Record<string, unknown>>(`/extraction/runs/${runId}/confirm`, { values, target }),
-      reject: (runId: number) => post<void>(`/extraction/runs/${runId}/reject`),
     },
     reference: {
       all: () => get<T.ReferenceLists>('/reference'),

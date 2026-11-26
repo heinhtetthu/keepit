@@ -21,8 +21,13 @@ from app.services.audit import log_audit
 from app.services.serial_format import format_serial_number, validate_serial_format
 
 SORTABLE = {"created_at": Asset.created_at, "updated_at": Asset.updated_at, "asset_type": Asset.asset_type,
-            "brand": Asset.brand, "serial_number": Asset.serial_number, "warranty_end_date": Asset.warranty_end_date,
-            "purchase_date": Asset.purchase_date}
+            "brand": Asset.brand, "model": Asset.model, "serial_number": Asset.serial_number,
+            "warranty_end_date": Asset.warranty_end_date, "purchase_date": Asset.purchase_date,
+            "purchase_cost": Asset.purchase_cost, "location": Asset.location, "supplier": Asset.supplier,
+            "assignment_status": Asset.assignment_status, "condition_status": Asset.condition_status}
+
+
+WARRANTY_STATES = ("active", "expiring", "expired", "none")
 
 
 def _today() -> date:
@@ -81,6 +86,11 @@ def asset_filter_stmt(f: "s.AssetFilters"):
         stmt = stmt.where(Asset.model.ilike(f"%{f.model.strip()}%"))
     if f.employee_id:
         stmt = stmt.where(Asset.employee_id == f.employee_id)
+    emp_ids = [int(x) for x in _csv(f.employee_ids) if x.isdigit()]
+    if emp_ids:
+        stmt = stmt.where(Asset.employee_id.in_(emp_ids))
+    if f.hide_written_off:
+        stmt = stmt.where(Asset.condition_status != "Written-Off")
     units = _csv(f.business_unit)
     if units:
         stmt = stmt.where(Asset.employee_id.in_(select(Employee.id).where(or_(*[Employee.business_units.contains([u]) for u in units]))))
@@ -92,17 +102,17 @@ def asset_filter_stmt(f: "s.AssetFilters"):
         stmt = stmt.where(Asset.warranty_end_date >= f.warranty_from)
     if f.warranty_to or f.warranty_before:
         stmt = stmt.where(Asset.warranty_end_date <= (f.warranty_to or f.warranty_before))
-    if f.warranty:
+    states = [w for w in _csv(f.warranty) if w in WARRANTY_STATES]
+    if states:
+        from datetime import timedelta
         d0 = _today()
-        if f.warranty == "active":
-            stmt = stmt.where(Asset.warranty_end_date >= d0)
-        elif f.warranty == "expiring":
-            from datetime import timedelta
-            stmt = stmt.where(Asset.warranty_end_date.between(d0, d0 + timedelta(days=90)))
-        elif f.warranty == "expired":
-            stmt = stmt.where(Asset.warranty_end_date < d0)
-        elif f.warranty == "none":
-            stmt = stmt.where(Asset.warranty_end_date.is_(None))
+        conds = {
+            "active": Asset.warranty_end_date >= d0,
+            "expiring": Asset.warranty_end_date.between(d0, d0 + timedelta(days=90)),
+            "expired": Asset.warranty_end_date < d0,
+            "none": Asset.warranty_end_date.is_(None),
+        }
+        stmt = stmt.where(or_(*[conds[w] for w in states]))
     if f.cost_min is not None:
         stmt = stmt.where(Asset.purchase_cost >= f.cost_min)
     if f.cost_max is not None:
@@ -117,11 +127,36 @@ async def list_assets(db: AsyncSession, f: "s.AssetFilters", *, sort: str = "cre
                       page: int = 1, page_size: int = 50) -> dict[str, Any]:
     stmt = asset_filter_stmt(f)
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    col = SORTABLE.get(sort, Asset.created_at)
+    if sort == "holder":
+        holder = select(Employee.name).where(Employee.id == Asset.employee_id).scalar_subquery()
+        col = holder
+    else:
+        col = SORTABLE.get(sort, Asset.created_at)
     stmt = stmt.order_by(col.desc().nullslast() if order == "desc" else col.asc().nullslast(), Asset.id.desc())
     rows = (await db.execute(stmt.offset((page - 1) * page_size).limit(page_size))).unique().scalars().all()
     return {"items": rows, "page": page, "page_size": page_size, "total": total,
             "total_pages": max(1, ceil(total / page_size))}
+
+
+async def asset_summary(db: AsyncSession) -> dict[str, int]:
+    """Counts behind the asset list's preset tabs."""
+    from datetime import timedelta
+    d0 = _today()
+    live = Asset.deleted_at.is_(None)
+    kept = Asset.condition_status != "Written-Off"
+
+    def n(*conds):
+        return func.count(Asset.id).filter(*conds)
+    row = (await db.execute(select(
+        n(kept), n(kept, Asset.assignment_status == "Assigned"),
+        n(kept, Asset.assignment_status == "Unassigned", Asset.condition_status == "Operational"),
+        n(kept, Asset.assignment_status == "Borrowed"),
+        n(Asset.condition_status == "In Repair"),
+        n(kept, Asset.warranty_end_date.between(d0, d0 + timedelta(days=90))),
+        n(Asset.condition_status == "Written-Off"),
+    ).where(live))).one()
+    keys = ("total", "assigned", "available", "borrowed", "in_repair", "warranty_expiring", "written_off")
+    return dict(zip(keys, (int(x) for x in row)))
 
 
 async def asset_detail(db: AsyncSession, asset_id: int) -> dict[str, Any]:

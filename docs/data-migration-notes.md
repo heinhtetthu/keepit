@@ -31,7 +31,7 @@ Same tables and columns (the baseline is Renewly's migration 0029 squashed). Cop
 | `reference_brands/asset_types/locations/regions/vendors` | `reference_items(kind, name, meta)` | Vendor contact fields → `meta` |
 | `reference_departments` | `business_units` | |
 | `documents` + `document_links` | `documents` + `document_links` | `stored_name` → `storage_key`; copy files from the old `DOCUMENTS_DIR` unchanged. Map `entity_id` strings to new integer ids. `it_log` links → `borrow` |
-| `extraction_runs` | `extraction_runs` | Optional (history only) |
+| `extraction_runs` | — | Not migrated (AI extraction was removed) |
 | `exchange_rates`, `app_settings.default_currency` | `system_settings` keys `exchange_rates` (JSON), `default_currency` | |
 | `audit_logs` | `audit_logs` | Optional. Store the old actor/target JSON in `details`. The integrity chain restarts at import |
 | `webauthn_credentials` | `webauthn_credentials` | Only valid if the RP ID (domain) stays the same. Otherwise users re-register passkeys |

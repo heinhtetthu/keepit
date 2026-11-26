@@ -50,9 +50,9 @@ export default function AssistantChat() {
     if (!open) return
     const outside = (e: PointerEvent) => { if (e.target instanceof Node && !container.current?.contains(e.target)) setOpen(false) }
     const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('pointerdown', outside)
+    document.addEventListener('pointerdown', outside, true)
     document.addEventListener('keydown', escape)
-    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+    return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape) }
   }, [open])
   useEffect(() => {  // grow the box with the text (1–4 lines)
     const el = input.current

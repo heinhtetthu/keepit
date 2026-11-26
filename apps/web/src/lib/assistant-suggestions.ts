@@ -6,7 +6,6 @@ export const assistantQuestions = [
   { question: 'How do I log a repair?', permission: 'itlog.view' },
   { question: 'How do I assign assets to a new hire?', permission: 'asset.edit' },
   { question: 'How do I offboard an employee?', permission: 'asset.edit' },
-  { question: 'How does AI document extraction work?', permission: 'document.view' },
   { question: 'How do I upload a document?', permission: 'document.view' },
   { question: 'How do I add a passkey?', permission: null },
   { question: 'What expires in the next 30 days?', permission: 'record.view' },
@@ -37,7 +36,7 @@ export function shuffledQuestions(can: (permission: string) => boolean, isSystem
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]
   }
-  const pattern = /assets|asset|warrant|laptop/.test(context) ? /asset|warrant|assign|repair/ : /it-logs|borrow|repair|lend/.test(context) ? /borrow|lend|repair|overdue/ : /documents|extract|upload/.test(context) ? /document|extraction|upload/ : /employees|offboard|quick-actions/.test(context) ? /offboard|assign/ : /reports|forecast/.test(context) ? /forecast/ : /notifications|telegram/.test(context) ? /Telegram|reminder/ : /renewals|reminder/.test(context) ? /reminder|expir|overdue/ : /record-types|fields/.test(context) ? /fields|import/ : /records|expir|overdue/.test(context) ? /records|expir|overdue|columns|views/ : /settings|profile|password/.test(context) ? /password|profile|timezone/ : null
+  const pattern = /assets|asset|warrant|laptop/.test(context) ? /asset|warrant|assign|repair/ : /it-logs|borrow|repair|lend/.test(context) ? /borrow|lend|repair|overdue/ : /documents|upload/.test(context) ? /document|upload/ : /employees|offboard|quick-actions/.test(context) ? /offboard|assign/ : /reports|forecast/.test(context) ? /forecast/ : /notifications|telegram/.test(context) ? /Telegram|reminder/ : /renewals|reminder/.test(context) ? /reminder|expir|overdue/ : /record-types|fields/.test(context) ? /fields|import/ : /records|expir|overdue/.test(context) ? /records|expir|overdue|columns|views/ : /settings|profile|password/.test(context) ? /password|profile|timezone/ : null
   if (pattern) pool.sort((a, b) => Number(pattern.test(b)) - Number(pattern.test(a)))
   let selected = pool.slice(0, 3)
   // A fresh expansion always changes the sequence, even if the shuffle repeats.

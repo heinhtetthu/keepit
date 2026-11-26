@@ -45,6 +45,12 @@ export function useAssets(params: QueryParams) {
   return useQuery({ queryKey: keys.assets(params), queryFn: () => api.assets.list(params), placeholderData: keepPreviousData })
 }
 
+/** Counts for the asset list's preset tabs. */
+export function useAssetTabCounts() {
+  const api = useApi()
+  return useQuery({ queryKey: ['assets', 'tab-counts'], queryFn: () => api.assets.tabCounts(), refetchInterval: 60_000 })
+}
+
 export function useAsset(id: number) {
   const api = useApi()
   return useQuery({ queryKey: keys.asset(id), queryFn: () => api.assets.get(id), enabled: id > 0 })

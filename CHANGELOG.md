@@ -4,10 +4,16 @@
 
 ### Added
 - Reports hub with asset reports (inventory, repairs & costs, maintenance, borrows, warranty expiry, who holds what), summary tiles, sorting and CSV export (`/api/v1/reports/assets`).
-- Full asset filter panel (type, brand, model, supplier, assignment, condition, location, business unit, holder, purchase date/cost, warranty, open repair) with removable chips; filters live in the URL.
+- Asset list now works like a record list: preset tabs with counts (All, In use, Available, Borrowed, In repair, Warranty ending, Written-off), the same right-side filter panel, sort menu, column picker, saved views (`saved_views.scope`, migration `0005_saved_view_scope`), "Open this view by default", and Show written-off / Show trash. New `GET /assets/summary`; asset filters gain `employee_ids`, `hide_written_off` and multi-value `warranty`; more sort keys (holder, model, location, cost…).
 - Employee phone (migration `0004_employee_phone`), joined date, Active/Resigned status and resignation date in one add/edit form; business units are a multi-select.
 
+### Removed
+- AI document extraction (endpoints, dialog, `extraction.run` permission, `extraction_runs` table via migration `0006_remove_extraction`, `pypdf`). The AI provider setting is now only for the assistant.
+
 ### Changed
+- Reports: a compact report picker in the toolbar replaces the side list, so the report uses the full width.
+- Dropdowns collapse on any outside click, including inside dialogs (capture-phase listeners), and a surrounding `<label>` no longer re-opens them or removes the first chosen option.
+- Rows-per-page picker shows the whole number.
 - Every table footer: count on the left, a narrow "Rows per page" and pagination on one line on the right (`TablePager`).
 - "Ask Keepit" launcher is translucent until hovered or opened.
 - Popovers cap their height to the space on screen (above the phone tab bar); Escape in a nested dropdown no longer closes the whole panel.

@@ -165,7 +165,7 @@ export function AI() {
   useEffect(() => { if (data) setF({ base_url: data.base_url, model: data.model, api_key: '' }) }, [data])
   return (
     <Card><CardContent className="space-y-3 p-4">
-      <p className="text-sm text-gray-500">Used by document extraction and the assistant. Any OpenAI-compatible endpoint works (OpenAI, Azure OpenAI, OpenRouter, a local server). Users need the <code>assistant.use</code> or <code>extraction.run</code> permission.</p>
+      <p className="text-sm text-gray-500">Used by the Ask Keepit assistant. Any OpenAI-compatible endpoint works (OpenAI, Azure OpenAI, OpenRouter, a local server). Users need the <code>assistant.use</code> permission.</p>
       <Field label="Base URL"><Input value={f.base_url} placeholder="https://api.openai.com/v1" onChange={(e) => setF({ ...f, base_url: e.target.value })} /></Field>
       <Field label="Model"><Input value={f.model} placeholder="e.g. gpt-4o-mini" onChange={(e) => setF({ ...f, model: e.target.value })} /></Field>
       <Field label="API key" hint={data?.has_key ? 'A key is saved (encrypted). Leave empty to keep it.' : 'Stored encrypted.'}><Input type="password" autoComplete="off" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} /></Field>

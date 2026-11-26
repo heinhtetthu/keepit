@@ -36,7 +36,7 @@ if not TEST_DATABASE_URL:
         os.path.join(ROOT, "test_license_flows.py"),
         os.path.join(ROOT, "test_assets.py"),
         os.path.join(ROOT, "test_account.py"),
-        os.path.join(ROOT, "test_extraction_and_workspace.py"),
+        os.path.join(ROOT, "test_workspace.py"),
         os.path.join(ROOT, "test_rls.py"),
     ]
 else:

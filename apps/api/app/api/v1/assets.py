@@ -21,6 +21,11 @@ async def list_assets(
     return await svc.list_assets(db, filters, sort=sort, order=order, page=page, page_size=page_size)
 
 
+@router.get("/summary", response_model=s.AssetTabCounts)
+async def asset_summary(db: AsyncSession = DB, user=Depends(require_permission("asset.view"))):
+    return await svc.asset_summary(db)
+
+
 @router.post("", response_model=s.AssetResponse, status_code=201)
 async def create_asset(data: s.AssetCreate, db: AsyncSession = DB, user=Depends(require_permission("asset.create"))):
     return await svc.create_asset(db, data, user.id)

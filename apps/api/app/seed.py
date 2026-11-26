@@ -13,6 +13,8 @@ from app.services.access_levels import system_roles
 
 logger = logging.getLogger("seed")
 
+RETIRED_PERMISSIONS = ["extraction.run"]
+
 PERMISSIONS = [
     "record.view", "record.create", "record.edit", "record.delete",
     "record_type.view", "record_type.create", "record_type.edit", "record_type.delete",
@@ -27,7 +29,7 @@ PERMISSIONS = [
     "asset.view", "asset.create", "asset.edit", "asset.delete",
     "itlog.view", "itlog.manage",
     "document.view", "document.upload", "document.edit", "document.delete",
-    "extraction.run", "assistant.use", "reference.manage",
+    "assistant.use", "reference.manage",
 ]
 
 # Structured access roles (Assets/Records levels, Workspace admin, AI assistant).
@@ -56,6 +58,10 @@ async def sync_permissions_and_roles(db: AsyncSession) -> None:
             p = Permission(name=name, description=f"Permission to {name.replace('.', ' ')}")
             db.add(p)
             existing[name] = p
+    # Permissions for removed features (AI document extraction, 2026-11).
+    for name in RETIRED_PERMISSIONS:
+        if name in existing:
+            await db.delete(existing.pop(name))
     await db.flush()
     roles = {r.name: r for r in (await db.execute(select(Role).options(selectinload(Role.permissions)))).scalars().all()}
     for role_name, data in ROLES.items():

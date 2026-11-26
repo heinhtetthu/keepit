@@ -5,7 +5,7 @@ from app.api.v1 import operations
 from app.api.v1 import report_jobs
 
 from app.api.v1 import user_access, branding, asset_reports
-from app.api.v1 import account, assets, borrows, documents, extraction, reference, workspace
+from app.api.v1 import account, assets, borrows, documents, reference, workspace
 from app.api.v1 import auth, users, record_types, records, assignments, employees, business_units, reminders, reports, audit, health, dashboard, settings, views, import_records, search
 
 api_router = APIRouter(prefix="/api/v1")
@@ -37,5 +37,4 @@ api_router.include_router(assets.router)
 api_router.include_router(borrows.router)
 api_router.include_router(documents.router)
 api_router.include_router(reference.router)
-api_router.include_router(extraction.router)
 api_router.include_router(workspace.router)

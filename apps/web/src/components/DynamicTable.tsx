@@ -440,7 +440,7 @@ export default function DynamicTable({
   )
 }
 
-function SortTh({ slug, sort, order, onSort, disabled, resizer, children }: {
+export function SortTh({ slug, sort, order, onSort, disabled, resizer, children }: {
   slug: string
   sort?: string
   order?: 'asc' | 'desc'

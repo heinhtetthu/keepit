@@ -1,9 +1,11 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_permission
-from app.core.exceptions import NotFoundException
+from app.api.deps import get_current_user, has_permission
+from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.db.session import get_db
 from app.models.settings import SavedView
 from app.models.user import User
@@ -13,13 +15,22 @@ from app.services import access as access_service
 router = APIRouter(prefix="/views", tags=["saved-views"])
 
 
+def _need(user: User, permission: str) -> None:
+    if not has_permission(user, permission):
+        raise ForbiddenException(f"Missing permission: {permission}")
+
+
 @router.get("", response_model=list[SavedViewResponse])
 async def list_views(
     record_type_id: int | None = None,
+    scope: Literal["records", "assets"] = "records",
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ):
-    query = select(SavedView).where(SavedView.user_id == user.id)
+    query = select(SavedView).where(SavedView.user_id == user.id, SavedView.scope == scope)
+    if scope == "assets":
+        _need(user, "asset.view")
+        return (await db.execute(query.order_by(SavedView.created_at))).scalars().all()
     allowed = await access_service.allowed_type_ids(db, user)
     if record_type_id is not None:
         await access_service.ensure_type_access(db, user, record_type_id)
@@ -36,9 +47,17 @@ async def list_views(
 async def create_view(
     data: SavedViewCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user: User = Depends(require_permission("record.view")),
+    user: User = Depends(get_current_user),
 ):
-    await access_service.ensure_type_access(db, user, data.record_type_id)
+    if data.scope == "assets":
+        _need(user, "asset.view")
+        if data.record_type_id is not None:
+            raise ValidationException("Asset views cannot have a record type")
+    else:
+        _need(user, "record.view")
+        if data.record_type_id is None:
+            raise ValidationException("Choose a record type for this view")
+        await access_service.ensure_type_access(db, user, data.record_type_id)
     view = SavedView(user_id=user.id, **data.model_dump())
     db.add(view)
     await db.flush()

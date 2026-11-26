@@ -10,7 +10,7 @@ each grant is View or Edit. System administrators bypass everything.
 """
 
 ASSET_VIEW = ["employee.view", "asset.view", "itlog.view", "document.view"]
-ASSET_EDIT = ASSET_VIEW + ["asset.create", "asset.edit", "itlog.manage", "document.upload", "document.edit", "extraction.run"]
+ASSET_EDIT = ASSET_VIEW + ["asset.create", "asset.edit", "itlog.manage", "document.upload", "document.edit"]
 ASSET_MANAGE = ASSET_EDIT + ["asset.delete", "document.delete", "employee.manage", "reference.manage"]
 
 RECORD_VIEW = ["record.view", "record_type.view", "field.view", "reminder.view", "notification.view", "report.view", "employee.view"]
@@ -35,8 +35,8 @@ CATALOG = {
              "can": ["Browse and search assets", "Open asset history and IT logs", "View and download documents", "See the employee directory"],
              "cannot": ["Add, edit, assign or lend anything", "Upload documents", "Delete anything"]},
             {"key": "editor", "title": "Editor", "permissions": ASSET_EDIT,
-             "description": "Day-to-day IT work: add and edit assets, assign and reassign, log repairs, maintenance and borrows, upload documents and run AI extraction.",
-             "can": ["Everything a Viewer can", "Add and edit assets, import CSV", "Assign, reassign and retire", "Log repairs, maintenance and borrows", "Upload and edit documents, run AI extraction"],
+             "description": "Day-to-day IT work: add and edit assets, assign and reassign, log repairs, maintenance and borrows, and upload documents.",
+             "can": ["Everything a Viewer can", "Add and edit assets, import CSV", "Assign, reassign and retire", "Log repairs, maintenance and borrows", "Upload and edit documents"],
              "cannot": ["Delete or restore assets and documents", "Add or edit employees", "Change asset lists, templates or auto numbers"]},
             {"key": "manager", "title": "Manager", "permissions": ASSET_MANAGE,
              "description": "Owns the asset side: everything an Editor can, plus deleting and restoring, the employee directory and asset configuration.",

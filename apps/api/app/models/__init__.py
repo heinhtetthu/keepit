@@ -14,7 +14,7 @@ from app.models.audit import AuditLog
 from app.models.settings import SavedView, SystemSetting
 from app.models.reference import ReferenceItem
 from app.models.asset import Asset, AssetAssignment, AssetRepair, AssetMaintenance, AssetBorrow, AssetTypeTemplate, AssetSerialSetting
-from app.models.document import Document, DocumentLink, ExtractionRun
+from app.models.document import Document, DocumentLink
 from app.models.credentials import WebAuthnCredential, WebAuthnChallenge, PasswordResetToken, ApiToken
 
 __all__ = [
@@ -31,6 +31,6 @@ __all__ = [
     "AuditLog", "SavedView", "SystemSetting",
     "ReferenceItem",
     "Asset", "AssetAssignment", "AssetRepair", "AssetMaintenance", "AssetBorrow", "AssetTypeTemplate", "AssetSerialSetting",
-    "Document", "DocumentLink", "ExtractionRun",
+    "Document", "DocumentLink",
     "WebAuthnCredential", "WebAuthnChallenge", "PasswordResetToken", "ApiToken",
 ]

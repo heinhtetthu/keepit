@@ -35,12 +35,12 @@ export default function RowMenu({ items, label = 'Actions' }: { items: MenuItem[
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', close)
+    document.addEventListener('mousedown', close, true)
     document.addEventListener('keydown', onKey)
     window.addEventListener('scroll', place, true)  // follow the button while lists scroll
     window.addEventListener('resize', place)
     return () => {
-      document.removeEventListener('mousedown', close)
+      document.removeEventListener('mousedown', close, true)
       document.removeEventListener('keydown', onKey)
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)

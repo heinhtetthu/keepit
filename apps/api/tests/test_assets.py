@@ -255,3 +255,22 @@ async def test_asset_filters_and_reports(client):
     csv_resp = await client.get("/api/v1/reports/assets/inventory", params={"format": "csv"}, headers=h)
     assert csv_resp.headers["content-type"].startswith("text/csv") and csv_resp.text.splitlines()[0].startswith("Asset,Type")
     assert (await client.get("/api/v1/reports/assets/nope", headers=h)).status_code == 404
+
+
+async def test_asset_summary_sort_and_views(client):
+    h = await _login(client)
+    emp = await _employee(client, h, name="Zaw")
+    a = await _asset(client, h, employee_id=emp["id"])
+    b = await _asset(client, h, serial_number="SN-9", brand="Acer")
+    await client.post(f"/api/v1/assets/{b['id']}/retire", headers=h)
+    summary = (await client.get("/api/v1/assets/summary", headers=h)).json()
+    assert summary["total"] == 1 and summary["assigned"] == 1 and summary["written_off"] == 1
+    q = lambda **p: client.get("/api/v1/assets", params=p, headers=h)
+    assert (await q(hide_written_off="true")).json()["total"] == 1
+    assert (await q(employee_ids=str(emp["id"]))).json()["items"][0]["id"] == a["id"]
+    assert (await q(sort="holder", order="asc")).status_code == 200
+    v = await client.post("/api/v1/views", json={"name": "Mine", "scope": "assets", "filters": {"brand": {"in": ["Dell"]}}}, headers=h)
+    assert v.status_code == 201 and v.json()["scope"] == "assets"
+    assert [x["name"] for x in (await client.get("/api/v1/views", params={"scope": "assets"}, headers=h)).json()] == ["Mine"]
+    assert (await client.get("/api/v1/views", headers=h)).json() == []
+    assert (await client.post("/api/v1/views", json={"name": "No type"}, headers=h)).status_code == 400

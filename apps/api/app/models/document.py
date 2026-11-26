@@ -50,23 +50,3 @@ class DocumentLink(Base):
     entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-
-
-class ExtractionRun(Base):
-    """One AI extraction attempt on a document. Nothing is written to records
-    until a human confirms (status success -> confirmed | rejected)."""
-    __tablename__ = "extraction_runs"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
-    doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="success", nullable=False, index=True)
-    model: Mapped[str | None] = mapped_column(String(255))
-    requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    error: Mapped[str | None] = mapped_column(Text)
-    result: Mapped[dict | None] = mapped_column(JSONB)
-    confirmed_values: Mapped[dict | None] = mapped_column(JSONB)
-    confirmed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    target: Mapped[dict | None] = mapped_column(JSONB)
-    extracted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)

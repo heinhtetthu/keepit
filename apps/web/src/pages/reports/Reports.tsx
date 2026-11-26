@@ -1,14 +1,15 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowDownUp, BarChart3, Boxes, CalendarClock, ClipboardCheck, Download, FileDown, Handshake, Laptop, Search,
+  ArrowDownUp, BarChart3, Boxes, CalendarClock, ChevronDown, ClipboardCheck, Download, FileDown, Handshake, Laptop, Search,
   ShieldCheck, TrendingUp, Users, Wrench,
 } from 'lucide-react'
 import { errorMessage, formatDate, formatMoney, useApi, useReference, type AssetReport, type AssetReportKind } from '@workspace/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import Popover from '@/components/ui/popover'
 import { toast } from '@/components/ui/toaster'
 import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
 import { useAuthStore } from '@/store/auth'
@@ -32,54 +33,66 @@ const REPORTS: ReportDef[] = [
 ]
 const ASSET_KINDS = new Set(['inventory', 'repairs', 'maintenance', 'borrows', 'warranties', 'holders'])
 
-/** Reports hub: pick a report on the left, see it on the right. */
+/** Reports: one compact picker in the toolbar, so the report gets the full width. */
 export default function Reports() {
   const has = useAuthStore((s) => s.hasPermission)
   const [sp, setSp] = useSearchParams()
   const available = REPORTS.filter((r) => has(r.permission))
   const current = available.find((r) => r.key === sp.get('report')) ?? available[0]
-  const groups = (['Assets', 'Renewals'] as const).map((g) => ({ g, items: available.filter((r) => r.group === g) })).filter((x) => x.items.length)
 
   if (!current) return <p className="rounded-xl border bg-white p-8 text-center text-sm text-gray-500">You don’t have access to any reports yet.</p>
+  const picker = <ReportPicker reports={available} current={current} onPick={(key) => setSp({ report: key }, { replace: true })} />
   return (
-    <div className="space-y-5">
-      <div>
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Reports</h1>
-        <p className="mt-1 text-sm text-gray-500">Pick a report. Filter it, sort any column, and download it as CSV.</p>
+        <p className="mt-1 text-sm text-gray-500">{current.description}</p>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
-        <nav aria-label="Reports" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:block lg:space-y-5 lg:overflow-visible lg:px-0">
+      <section key={current.key} className="flex min-h-0 min-w-0 flex-1 animate-page-in flex-col gap-4">
+        {ASSET_KINDS.has(current.key)
+          ? <AssetReportView def={current} picker={picker} />
+          : <>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">{picker}</div>
+            <Suspense fallback={<div className="skeleton h-64" />}><RenewalReports section={current.key as RenewalSection} /></Suspense>
+          </>}
+      </section>
+    </div>
+  )
+}
+
+function ReportPicker({ reports, current, onPick }: { reports: ReportDef[]; current: ReportDef; onPick: (key: string) => void }) {
+  const groups = (['Assets', 'Renewals'] as const).map((g) => ({ g, items: reports.filter((r) => r.group === g) })).filter((x) => x.items.length)
+  return (
+    <Popover align="left" panelClassName="w-[min(34rem,calc(100vw-2rem))] p-2" trigger={
+      <Button variant="outline" className="h-9 gap-2 pl-2 pr-2.5 font-medium" aria-label={`Report: ${current.title}. Change report`}>
+        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground"><current.icon className="h-3.5 w-3.5" /></span>
+        <span className="max-w-[12rem] truncate">{current.title}</span>
+        <ChevronDown className="h-4 w-4 text-gray-400" />
+      </Button>
+    }>
+      {(close) => (
+        <div className="grid gap-x-2 sm:grid-cols-2">
           {groups.map(({ g, items }) => (
-            <div key={g} className="contents lg:block lg:space-y-1">
-              <p className="hidden px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 lg:block">{g}</p>
+            <div key={g}>
+              <p className="px-2 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{g}</p>
               {items.map((r) => {
                 const active = r.key === current.key
                 return (
-                  <button key={r.key} onClick={() => setSp({ report: r.key }, { replace: true })} aria-current={active ? 'page' : undefined}
-                    className={cn('press flex shrink-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left lg:w-full',
-                      active ? 'border-primary/30 bg-primary-soft' : 'bg-white hover:bg-gray-50 lg:border-transparent lg:bg-transparent')}>
-                    <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-500')}><r.icon className="h-4 w-4" /></span>
+                  <button key={r.key} onClick={() => { onPick(r.key); close() }} aria-current={active ? 'page' : undefined}
+                    className={cn('flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors', active ? 'bg-primary-soft' : 'hover:bg-gray-50')}>
+                    <span className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-500')}><r.icon className="h-3.5 w-3.5" /></span>
                     <span className="min-w-0">
-                      <span className={cn('block whitespace-nowrap text-sm font-medium lg:whitespace-normal', active ? 'text-primary' : 'text-gray-800')}>{r.title}</span>
-                      <span className="hidden text-xs text-gray-500 lg:block">{r.description}</span>
+                      <span className={cn('block text-sm font-medium', active ? 'text-primary' : 'text-gray-800')}>{r.title}</span>
+                      <span className="block text-xs text-gray-500">{r.description}</span>
                     </span>
                   </button>
                 )
               })}
             </div>
           ))}
-        </nav>
-        <section key={current.key} className="min-w-0 animate-page-in space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-gradient text-primary-foreground"><current.icon className="h-5 w-5" /></span>
-            <div><h2 className="text-lg font-semibold text-gray-900">{current.title}</h2><p className="text-sm text-gray-500">{current.description}</p></div>
-          </div>
-          {ASSET_KINDS.has(current.key)
-            ? <AssetReportView def={current} />
-            : <Suspense fallback={<div className="skeleton h-64" />}><RenewalReports section={current.key as RenewalSection} /></Suspense>}
-        </section>
-      </div>
-    </div>
+        </div>
+      )}
+    </Popover>
   )
 }
 
@@ -104,7 +117,7 @@ const BADGE: Record<string, string> = {
   'Written-Off': 'bg-gray-100 text-gray-600', Unassigned: 'bg-gray-100 text-gray-600',
 }
 
-function AssetReportView({ def }: { def: ReportDef }) {
+function AssetReportView({ def, picker }: { def: ReportDef; picker: ReactNode }) {
   const api = useApi()
   const { data: ref } = useReference()
   const [q, setQ] = useState('')
@@ -156,8 +169,9 @@ function AssetReportView({ def }: { def: ReportDef }) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <form className="relative w-full sm:w-64" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()) }}>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {picker}
+        <form className="relative w-full sm:w-56" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()) }}>
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => setSearch(q.trim())} />
         </form>
@@ -182,16 +196,16 @@ function AssetReportView({ def }: { def: ReportDef }) {
       </div>
 
       {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{errorMessage(error)}</p>}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
         {(data?.summary ?? [{ label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }]).map((s, i) => (
-          <div key={i} className={cn('rounded-xl border bg-white p-4 shadow-soft', !data && 'skeleton h-20 border-0')}>
-            {data && <><p className="text-xs text-gray-500">{s.label}</p><p className="mt-1 truncate text-xl font-semibold text-gray-900">{typeof s.value === 'number' && /cost|value/i.test(s.label) ? formatMoney(s.value) : s.value}</p></>}
+          <div key={i} className={cn('rounded-xl border bg-white px-3.5 py-2.5 shadow-soft', !data && 'skeleton h-14 border-0')}>
+            {data && <><p className="text-xs text-gray-500">{s.label}</p><p className="truncate text-lg font-semibold tabular-nums text-gray-900">{typeof s.value === 'number' && /cost|value/i.test(s.label) ? formatMoney(s.value) : s.value}</p></>}
           </div>
         ))}
       </div>
 
-      <TableCard footer={<TablePager shown={shown.length} total={rows.length} noun="rows" page={page} pages={pages} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
-        <TableScrollArea className="max-h-[60vh]">
+      <TableCard className="min-h-[18rem] flex-1" footer={<TablePager shown={shown.length} total={rows.length} noun="rows" page={page} pages={pages} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
+        <TableScrollArea className="flex-1">
           {isLoading ? <div className="space-y-2 p-4">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-8" />)}</div> : !rows.length ? (
             <div className="flex flex-col items-center gap-2 py-14 text-center"><CalendarClock className="h-9 w-9 text-gray-300" /><p className="text-sm font-medium text-gray-700">Nothing to show</p><p className="text-sm text-gray-500">Try a wider period or clear the filters.</p></div>
           ) : (

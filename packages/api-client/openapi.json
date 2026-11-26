@@ -964,6 +964,50 @@
     "title": "AssetResponse",
     "type": "object"
    },
+   "AssetTabCounts": {
+    "description": "Counts for the preset tabs on the asset list (written-off assets are only in written_off).",
+    "properties": {
+     "assigned": {
+      "title": "Assigned",
+      "type": "integer"
+     },
+     "available": {
+      "title": "Available",
+      "type": "integer"
+     },
+     "borrowed": {
+      "title": "Borrowed",
+      "type": "integer"
+     },
+     "in_repair": {
+      "title": "In Repair",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     },
+     "warranty_expiring": {
+      "title": "Warranty Expiring",
+      "type": "integer"
+     },
+     "written_off": {
+      "title": "Written Off",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "total",
+     "assigned",
+     "available",
+     "borrowed",
+     "in_repair",
+     "warranty_expiring",
+     "written_off"
+    ],
+    "title": "AssetTabCounts",
+    "type": "object"
+   },
    "AssetUpdate": {
     "properties": {
      "asset_type": {
@@ -2599,20 +2643,6 @@
      "status"
     ],
     "title": "ComponentStatus",
-    "type": "object"
-   },
-   "ConfirmRequest": {
-    "properties": {
-     "target": {
-      "title": "Target",
-      "type": "object"
-     },
-     "values": {
-      "title": "Values",
-      "type": "object"
-     }
-    },
-    "title": "ConfirmRequest",
     "type": "object"
    },
    "CurrencySettings": {
@@ -7222,25 +7252,6 @@
     "title": "RoleUpdate",
     "type": "object"
    },
-   "RunRequest": {
-    "properties": {
-     "doc_type": {
-      "maxLength": 30,
-      "title": "Doc Type",
-      "type": "string"
-     },
-     "document_id": {
-      "title": "Document Id",
-      "type": "integer"
-     }
-    },
-    "required": [
-     "document_id",
-     "doc_type"
-    ],
-    "title": "RunRequest",
-    "type": "object"
-   },
    "SavedViewCreate": {
     "properties": {
      "filters": {
@@ -7270,6 +7281,15 @@
        }
       ],
       "title": "Record Type Id"
+     },
+     "scope": {
+      "default": "records",
+      "enum": [
+       "records",
+       "assets"
+      ],
+      "title": "Scope",
+      "type": "string"
      },
      "sort": {
       "anyOf": [
@@ -7334,6 +7354,11 @@
        }
       ],
       "title": "Record Type Id"
+     },
+     "scope": {
+      "default": "records",
+      "title": "Scope",
+      "type": "string"
      },
      "sort": {
       "anyOf": [
@@ -8549,6 +8574,23 @@
      },
      {
       "in": "query",
+      "name": "employee_ids",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 2000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Ids"
+      }
+     },
+     {
+      "in": "query",
       "name": "purchase_from",
       "required": false,
       "schema": {
@@ -8639,12 +8681,8 @@
       "schema": {
        "anyOf": [
         {
-         "enum": [
-          "active",
-          "expiring",
-          "expired",
-          "none"
-         ],
+         "maxLength": 100,
+         "pattern": "^[a-z,]*$",
          "type": "string"
         },
         {
@@ -8708,6 +8746,16 @@
         }
        ],
        "title": "Open Repair"
+      }
+     },
+     {
+      "in": "query",
+      "name": "hide_written_off",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Hide Written Off",
+       "type": "boolean"
       }
      },
      {
@@ -9349,6 +9397,32 @@
      }
     ],
     "summary": "Generate Serial",
+    "tags": [
+     "assets"
+    ]
+   }
+  },
+  "/api/v1/assets/summary": {
+   "get": {
+    "operationId": "asset_summary_api_v1_assets_summary_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AssetTabCounts"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Asset Summary",
     "tags": [
      "assets"
     ]
@@ -12348,212 +12422,6 @@
     "summary": "Release Employee",
     "tags": [
      "employees"
-    ]
-   }
-  },
-  "/api/v1/extraction/doc-types": {
-   "get": {
-    "operationId": "doc_types_api_v1_extraction_doc_types_get",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Doc Types",
-    "tags": [
-     "extraction"
-    ]
-   }
-  },
-  "/api/v1/extraction/runs": {
-   "get": {
-    "operationId": "runs_api_v1_extraction_runs_get",
-    "parameters": [
-     {
-      "in": "query",
-      "name": "document_id",
-      "required": true,
-      "schema": {
-       "title": "Document Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Runs",
-    "tags": [
-     "extraction"
-    ]
-   },
-   "post": {
-    "operationId": "run_api_v1_extraction_runs_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/RunRequest"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Run",
-    "tags": [
-     "extraction"
-    ]
-   }
-  },
-  "/api/v1/extraction/runs/{run_id}/confirm": {
-   "post": {
-    "operationId": "confirm_api_v1_extraction_runs__run_id__confirm_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "run_id",
-      "required": true,
-      "schema": {
-       "title": "Run Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ConfirmRequest"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Confirm",
-    "tags": [
-     "extraction"
-    ]
-   }
-  },
-  "/api/v1/extraction/runs/{run_id}/reject": {
-   "post": {
-    "operationId": "reject_api_v1_extraction_runs__run_id__reject_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "run_id",
-      "required": true,
-      "schema": {
-       "title": "Run Id",
-       "type": "integer"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Reject",
-    "tags": [
-     "extraction"
     ]
    }
   },
@@ -16507,6 +16375,23 @@
      },
      {
       "in": "query",
+      "name": "employee_ids",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 2000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Ids"
+      }
+     },
+     {
+      "in": "query",
       "name": "purchase_from",
       "required": false,
       "schema": {
@@ -16597,12 +16482,8 @@
       "schema": {
        "anyOf": [
         {
-         "enum": [
-          "active",
-          "expiring",
-          "expired",
-          "none"
-         ],
+         "maxLength": 100,
+         "pattern": "^[a-z,]*$",
          "type": "string"
         },
         {
@@ -16666,6 +16547,16 @@
         }
        ],
        "title": "Open Repair"
+      }
+     },
+     {
+      "in": "query",
+      "name": "hide_written_off",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Hide Written Off",
+       "type": "boolean"
       }
      },
      {
@@ -19088,6 +18979,20 @@
         }
        ],
        "title": "Record Type Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "scope",
+      "required": false,
+      "schema": {
+       "default": "records",
+       "enum": [
+        "records",
+        "assets"
+       ],
+       "title": "Scope",
+       "type": "string"
       }
      }
     ],

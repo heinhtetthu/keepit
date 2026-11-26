@@ -35,7 +35,7 @@ const SECTIONS: Section[] = [
   { id: 'appearance', group: 'Workspace', title: 'Appearance', description: 'Theme, primary colour, logo and favicon.', icon: Palette, allowed: () => true, render: () => <AppearanceSection /> },
   { id: 'currency', group: 'Workspace', title: 'Currency', description: 'Default currency and exchange rates for costs.', icon: Banknote, allowed: (h) => h('settings.edit'), render: () => <Currency /> },
   { id: 'notifications', group: 'Workspace', title: 'Notifications', description: 'Telegram delivery and the daily asset digest.', icon: Bell, allowed: (h) => h('settings.view'), render: () => <NotificationsSection /> },
-  { id: 'ai', group: 'Workspace', title: 'AI', description: 'Provider for the assistant and document extraction.', icon: Sparkles, allowed: (_h, admin) => admin, render: () => <AI /> },
+  { id: 'ai', group: 'Workspace', title: 'AI', description: 'Provider for the Ask Keepit assistant.', icon: Sparkles, allowed: (_h, admin) => admin, render: () => <AI /> },
   { id: 'health', group: 'Workspace', title: 'System health', description: 'Encryption, backups and audit integrity.', icon: Activity, allowed: (h) => h('settings.view'), render: () => <SecurityHealth /> },
   { id: 'users', group: 'People', title: 'Users & roles', description: 'Who can sign in and what each role may do.', icon: ShieldCheck, allowed: (h) => h('user.view'), render: () => <UsersPanel /> },
   { id: 'asset-lists', group: 'Assets', title: 'Lists', description: 'Asset types, brands, locations, regions and vendors.', icon: ListChecks, allowed: (h) => h('reference.manage'), render: () => <div className="grid gap-4 md:grid-cols-2">{LISTS.map((l) => <RefList key={l.kind} kind={l.kind} label={l.label} />)}</div> },

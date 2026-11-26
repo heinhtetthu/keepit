@@ -74,8 +74,8 @@ export function RowsPerPageSelect({ value, onChange }: {
   return (
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-gray-500">
       <span>Rows per page</span>
-      <div className="w-[4.25rem]" aria-label="Rows per page">
-        <Combobox compact className="h-8 px-2.5 text-xs" value={String(value)} onChange={(v) => v && onChange(Number(v))}
+      <div className="w-[4.5rem]" aria-label="Rows per page">
+        <Combobox compact className="h-8 text-xs" value={String(value)} onChange={(v) => v && onChange(Number(v))}
           options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} />
       </div>
     </div>

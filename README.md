@@ -12,7 +12,7 @@ Keepit tracks IT assets (laptops, monitors, phones…), the people who hold them
 * **Assets:** assignment history, repairs (they set the asset to *In Repair*), maintenance checklists, borrows with overdue tracking, QR labels, CSV import, bulk actions, auto product numbers, trash and restore.
 * **Renewals:** custom record types with 16 field types, renewals and forecasts, auto-renewal, license-seat ownership, Telegram reminders, saved views, reports.
 * **People:** one employee directory. *Employee 360* shows everything a person holds. *Offboarding* returns their assets, closes borrows, releases seats and deactivates them in one step.
-* **Documents:** invoices, warranties and contracts linked to assets, people or records, with expiry dates. **AI extraction** fills in records from documents, with human review before anything is saved.
+* **Documents:** invoices, warranties and contracts linked to assets, people or records, with expiry dates.
 * **Ask Keepit:** a simple chat for quick answers about assets and renewals. It works without AI; AI is optional.
 * **Access you can explain:** separate Assets and Records levels, View/Edit per record type, and plain-language explanations in the UI. [docs/permissions.md](docs/permissions.md)
 * **Security:**
