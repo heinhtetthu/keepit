@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Keepit design tokens. Primary defaults to #3287f0 and can be changed in
+   Settings → Appearance (lib/branding.tsx overrides --primary at runtime). */
+@layer base {
+  :root {
+    --background: 216 33% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 213 86% 57%;          /* #3287f0 */
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 213 90% 96%;
+    --secondary: 214 32% 93%;
+    --secondary-foreground: 222 47% 15%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 32% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 28% 89%;
+    --input: 214 26% 85%;
+    --ring: 213 86% 57%;
+    --radius: 0.625rem;
+    /* Sidebar follows the theme: white in light mode, navy in dark mode. */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 15%;
+    --sidebar-muted: 215 16% 47%;
+    --sidebar-hover: 214 32% 95%;
+    --sidebar-border: 214 28% 90%;
+    color-scheme: light;
+  }
+  .dark {
+    --background: 222 49% 8%;
+    --foreground: 214 32% 92%;
+    --card: 220 44% 12%;
+    --card-foreground: 214 32% 92%;
+    --primary: 213 90% 64%;          /* brighter blue on dark for contrast */
+    --primary-foreground: 222 47% 8%;
+    --primary-soft: 213 40% 16%;
+    --secondary: 220 35% 17%;
+    --secondary-foreground: 214 32% 92%;
+    --muted: 220 35% 15%;
+    --muted-foreground: 216 18% 64%;
+    --accent: 220 35% 17%;
+    --accent-foreground: 214 32% 92%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 32% 19%;
+    --input: 220 30% 24%;
+    --ring: 213 90% 64%;
+    --sidebar: 224 52% 7%;
+    --sidebar-foreground: 214 32% 91%;
+    --sidebar-muted: 215 20% 62%;
+    --sidebar-hover: 222 40% 13%;
+    --sidebar-border: 222 38% 14%;
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  ::selection { background: hsl(var(--primary) / 0.22); }
+  :focus-visible { outline: none; }
+  input, textarea { @apply placeholder:text-gray-400; }
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
+  .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+  /* Quiet, thin scrollbars. */
+  * { scrollbar-width: thin; scrollbar-color: rgb(var(--c-gray-300)) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background: rgb(var(--c-gray-300)); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+}
+
+@layer components {
+  /* Shared interaction feel: soft press + smooth colour transitions. */
+  .press { @apply transition-[transform,background-color,border-color,color,box-shadow] duration-150 active:scale-[0.98]; }
+  .card-hover { @apply transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-lift; }
+  .skeleton { @apply relative overflow-hidden rounded-md bg-gray-100; }
+  .skeleton::after { content: ""; @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/50 to-transparent; animation: shimmer 1.4s infinite; }
+  .page-enter { @apply animate-page-in; }
+  .bg-brand-gradient { background-image: linear-gradient(135deg, hsl(var(--primary) / 0.78), hsl(var(--primary))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}

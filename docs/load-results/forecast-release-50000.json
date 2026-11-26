@@ -1,0 +1,271 @@
+{
+  "timestamp_utc": "2026-11-04T09:41:40.680021+00:00",
+  "records": 50000,
+  "description": "Synthetic data, direct HTTP API, warm cache; excludes browser/proxy and provider sends",
+  "percentile_method": "nearest rank",
+  "results": [
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 1,
+      "requests": 60,
+      "seconds": 24.47,
+      "requests_per_second": 2.45,
+      "p50_ms": 237.7,
+      "p95_ms": 1024.2,
+      "p99_ms": 1421.5,
+      "statuses": {
+        "200": 60
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 27.5,
+          "p95_ms": 31.0
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 237.7,
+          "p95_ms": 267.2
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 694.2,
+          "p95_ms": 1024.2
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 113.5,
+          "p95_ms": 169.8
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 883.0,
+          "p95_ms": 1421.5
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 5,
+      "requests": 60,
+      "seconds": 55.61,
+      "requests_per_second": 1.08,
+      "p50_ms": 2288.8,
+      "p95_ms": 18924.4,
+      "p99_ms": 19811.5,
+      "statuses": {
+        "200": 59,
+        "503": 1
+      },
+      "errors": [
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        }
+      ],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 92.5,
+          "p95_ms": 686.9
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 1897.1,
+          "p95_ms": 2824.3
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 1605.0,
+          "p95_ms": 2428.6
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 3673.4,
+          "p95_ms": 6021.0
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 15693.3,
+          "p95_ms": 19811.5
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 10,
+      "requests": 60,
+      "seconds": 41.57,
+      "requests_per_second": 1.44,
+      "p50_ms": 5278.5,
+      "p95_ms": 15499.2,
+      "p99_ms": 24805.2,
+      "statuses": {
+        "200": 53,
+        "503": 7
+      },
+      "errors": [
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        }
+      ],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 397.7,
+          "p95_ms": 2477.8
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 3909.8,
+          "p95_ms": 6281.4
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 4002.7,
+          "p95_ms": 7004.3
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 9026.0,
+          "p95_ms": 15499.2
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 10401.1,
+          "p95_ms": 24805.2
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 25,
+      "requests": 60,
+      "seconds": 27.31,
+      "requests_per_second": 2.2,
+      "p50_ms": 7186.5,
+      "p95_ms": 18701.6,
+      "p99_ms": 22275.5,
+      "statuses": {
+        "200": 50,
+        "503": 10
+      },
+      "errors": [
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        }
+      ],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 798.2,
+          "p95_ms": 2683.5
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 6566.5,
+          "p95_ms": 13659.4
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 4981.4,
+          "p95_ms": 7960.9
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 15197.7,
+          "p95_ms": 22275.5
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 11567.2,
+          "p95_ms": 19090.4
+        }
+      }
+    },
+    {
+      "scenario": "allocation-report",
+      "concurrency": 1,
+      "requests": 3,
+      "seconds": 20.08,
+      "requests_per_second": 0.15,
+      "p50_ms": 6661.8,
+      "p95_ms": 6833.9,
+      "p99_ms": 6833.9,
+      "statuses": {
+        "200": 3
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/reports/allocation": {
+          "requests": 3,
+          "p50_ms": 6661.8,
+          "p95_ms": 6833.9
+        }
+      }
+    }
+  ]
+}

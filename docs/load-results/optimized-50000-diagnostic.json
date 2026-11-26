@@ -1,0 +1,59 @@
+{
+  "timestamp_utc": "2026-11-04T09:15:03.222506+00:00",
+  "records": 50000,
+  "description": "Synthetic data, direct HTTP API, warm cache; excludes browser/proxy and provider sends",
+  "results": [
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 1,
+      "requests": 12,
+      "seconds": 5.43,
+      "requests_per_second": 2.21,
+      "p50_ms": 392.3,
+      "p95_ms": 783.3,
+      "p99_ms": 783.3,
+      "statuses": {
+        "200": 12
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "p50_ms": 28.8,
+          "p95_ms": 28.8
+        },
+        "/api/v1/search": {
+          "p50_ms": 392.0,
+          "p95_ms": 392.0
+        },
+        "/api/v1/dashboard": {
+          "p50_ms": 601.7,
+          "p95_ms": 601.7
+        },
+        "/api/v1/records/by-type/2?search": {
+          "p50_ms": 709.0,
+          "p95_ms": 709.0
+        }
+      }
+    },
+    {
+      "scenario": "allocation-report",
+      "concurrency": 1,
+      "requests": 3,
+      "seconds": 19.38,
+      "requests_per_second": 0.15,
+      "p50_ms": 6511.5,
+      "p95_ms": 6511.5,
+      "p99_ms": 6511.5,
+      "statuses": {
+        "200": 3
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/reports/allocation": {
+          "p50_ms": 6511.5,
+          "p95_ms": 6511.5
+        }
+      }
+    }
+  ]
+}

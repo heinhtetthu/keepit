@@ -1,0 +1,232 @@
+{
+  "timestamp_utc": "2026-11-04T09:35:28.828866+00:00",
+  "records": 50000,
+  "description": "Synthetic data, direct HTTP API, warm cache; excludes browser/proxy and provider sends",
+  "percentile_method": "nearest rank",
+  "results": [
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 1,
+      "requests": 60,
+      "seconds": 42.51,
+      "requests_per_second": 1.41,
+      "p50_ms": 682.7,
+      "p95_ms": 1200.5,
+      "p99_ms": 5811.6,
+      "statuses": {
+        "200": 60
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 29.6,
+          "p95_ms": 42.8
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 369.7,
+          "p95_ms": 1007.3
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 725.8,
+          "p95_ms": 1184.1
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 768.1,
+          "p95_ms": 1576.9
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 960.4,
+          "p95_ms": 5811.6
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 10,
+      "requests": 60,
+      "seconds": 46.81,
+      "requests_per_second": 1.28,
+      "p50_ms": 6025.7,
+      "p95_ms": 18985.7,
+      "p99_ms": 23935.0,
+      "statuses": {
+        "200": 51,
+        "503": 9
+      },
+      "errors": [
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        }
+      ],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 453.2,
+          "p95_ms": 1297.2
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 5080.1,
+          "p95_ms": 9548.3
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 6819.1,
+          "p95_ms": 12344.2
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 6025.7,
+          "p95_ms": 15986.6
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 10580.5,
+          "p95_ms": 23935.0
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 25,
+      "requests": 60,
+      "seconds": 53.75,
+      "requests_per_second": 1.12,
+      "p50_ms": 18887.0,
+      "p95_ms": 43844.2,
+      "p99_ms": 51068.9,
+      "statuses": {
+        "200": 49,
+        "503": 11
+      },
+      "errors": [
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        },
+        {
+          "path": "/api/v1/reports/forecast",
+          "status": 503
+        }
+      ],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 1505.8,
+          "p95_ms": 4968.4
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 22790.8,
+          "p95_ms": 33062.5
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 19468.6,
+          "p95_ms": 51068.9
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 13358.3,
+          "p95_ms": 26311.5
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 33098.9,
+          "p95_ms": 48866.9
+        }
+      }
+    },
+    {
+      "scenario": "allocation-report",
+      "concurrency": 1,
+      "requests": 3,
+      "seconds": 20.87,
+      "requests_per_second": 0.14,
+      "p50_ms": 6958.1,
+      "p95_ms": 6996.3,
+      "p99_ms": 6996.3,
+      "statuses": {
+        "200": 3
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/reports/allocation": {
+          "requests": 3,
+          "p50_ms": 6958.1,
+          "p95_ms": 6996.3
+        }
+      }
+    }
+  ]
+}

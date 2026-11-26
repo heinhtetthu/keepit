@@ -1,0 +1,139 @@
+{
+  "timestamp_utc": "2026-11-05T09:59:27.635077+00:00",
+  "records": 50000,
+  "description": "Synthetic data, direct HTTP API, warm cache; excludes browser/proxy and provider sends",
+  "percentile_method": "nearest rank",
+  "results": [
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 1,
+      "requests": 60,
+      "seconds": 2.12,
+      "requests_per_second": 28.32,
+      "p50_ms": 33.9,
+      "p95_ms": 54.7,
+      "p99_ms": 113.3,
+      "statuses": {
+        "200": 60
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 33.9,
+          "p95_ms": 53.3
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 49.2,
+          "p95_ms": 100.0
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 17.7,
+          "p95_ms": 23.7
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 43.5,
+          "p95_ms": 113.3
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 19.6,
+          "p95_ms": 23.3
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 10,
+      "requests": 60,
+      "seconds": 2.27,
+      "requests_per_second": 26.45,
+      "p50_ms": 193.9,
+      "p95_ms": 1355.9,
+      "p99_ms": 1437.6,
+      "statuses": {
+        "200": 60
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 243.0,
+          "p95_ms": 1355.9
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 209.9,
+          "p95_ms": 1415.1
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 130.9,
+          "p95_ms": 1260.9
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 144.3,
+          "p95_ms": 1268.6
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 211.6,
+          "p95_ms": 1437.6
+        }
+      }
+    },
+    {
+      "scenario": "interactive-mix",
+      "concurrency": 25,
+      "requests": 60,
+      "seconds": 1.86,
+      "requests_per_second": 32.21,
+      "p50_ms": 533.3,
+      "p95_ms": 1377.1,
+      "p99_ms": 1604.3,
+      "statuses": {
+        "200": 60
+      },
+      "errors": [],
+      "by_path": {
+        "/api/v1/records/by-type/1": {
+          "requests": 12,
+          "p50_ms": 584.3,
+          "p95_ms": 1555.0
+        },
+        "/api/v1/search": {
+          "requests": 12,
+          "p50_ms": 512.8,
+          "p95_ms": 1523.8
+        },
+        "/api/v1/dashboard": {
+          "requests": 12,
+          "p50_ms": 361.6,
+          "p95_ms": 1168.2
+        },
+        "/api/v1/reports/forecast": {
+          "requests": 12,
+          "p50_ms": 467.9,
+          "p95_ms": 1368.6
+        },
+        "/api/v1/records/by-type/2?search": {
+          "requests": 12,
+          "p50_ms": 805.6,
+          "p95_ms": 1604.3
+        }
+      }
+    },
+    {
+      "scenario": "background-allocation",
+      "queue_ms": 359.1,
+      "completion_seconds": 10.54,
+      "first_page_ms": 917.0,
+      "total_records": 15833,
+      "returned_records": 50
+    }
+  ]
+}

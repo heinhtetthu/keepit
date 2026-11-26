@@ -1,0 +1,160 @@
+# Keepit stack: Postgres, API, worker, web (nginx serving the SPA + proxying /api),
+# encrypted backups, and an on-demand MCP server.
+x-api-env: &api-env
+  # The API and worker use the limited keepit_app role, so PostgreSQL row-level
+  # security applies to them. Migrations use the owner account below.
+  DATABASE_URL: postgresql+asyncpg://keepit_app:${APP_DB_PASSWORD:?Run scripts/init-local-security.py first}@postgres:5432/${POSTGRES_DB:-records}
+  MIGRATION_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-records}
+  APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+  SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+  APP_NAME: ${APP_NAME:-Keepit}
+  APP_ENV: ${DEPLOYMENT_ENV:-development}
+  TIMEZONE: ${TIMEZONE:-Asia/Yangon}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+  API_URL: ${API_URL:-http://localhost:8000}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATA_ENCRYPTION_KEYS: ${DATA_ENCRYPTION_KEYS:-}
+  # Documents: local volume by default; set STORAGE_BACKEND=s3 + S3_* to scale out.
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  DOCUMENTS_DIR: /data/documents
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+  # AI (assistant + extraction): any OpenAI-compatible endpoint. Also editable in Asset Settings > AI.
+  AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+  AI_API_KEY: ${AI_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-}
+  AI_ALLOW_LOCAL_PROVIDER: ${AI_ALLOW_LOCAL_PROVIDER:-false}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-records}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  backend:
+    build: ./apps/api
+    image: keepit-api:latest
+    environment:
+      <<: *api-env
+      TRUST_PROXY_HEADERS: "true"
+      REQUIRE_ADMIN_MFA: ${REQUIRE_ADMIN_MFA:-false}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      DELETED_RECORD_RETENTION_DAYS: ${DELETED_RECORD_RETENTION_DAYS:-30}
+      FORECAST_MAX_CONCURRENT: ${FORECAST_MAX_CONCURRENT:-2}
+      FORECAST_QUERY_TIMEOUT_SECONDS: ${FORECAST_QUERY_TIMEOUT_SECONDS:-15}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_RP_NAME: ${APP_NAME:-Keepit}
+      AUTO_SEED: ${AUTO_SEED:-true}
+      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-http://localhost}
+    volumes:
+      - ./backups:/backups:ro
+      - exports_data:/exports
+      - documents_data:/data/documents
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready')"]
+      interval: 15s
+      timeout: 10s
+      start_period: 40s
+      retries: 5
+    networks: [internal]
+
+  worker:
+    restart: unless-stopped
+    image: keepit-api:latest
+    command: python -m app.workers.scheduler
+    environment:
+      <<: *api-env
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-300}
+      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-100}
+      WORKER_MAX_RETRIES: ${WORKER_MAX_RETRIES:-3}
+      WORKER_RETRY_DELAY_SECONDS: ${WORKER_RETRY_DELAY_SECONDS:-60}
+      DELIVERY_CONCURRENCY: ${DELIVERY_CONCURRENCY:-4}
+    volumes:
+      - exports_data:/exports
+      - documents_data:/data/documents
+    depends_on:
+      postgres: { condition: service_healthy }
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.workers.health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    networks: [internal]
+
+  frontend:
+    restart: unless-stopped
+    image: keepit-web:latest
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-80}:8080"
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [internal]
+
+  backups:
+    build:
+      context: .
+      dockerfile: ops/backup/Dockerfile
+    command: ["--loop"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-records}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:?Run scripts/init-local-security.py first}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [internal]
+
+  # MCP server for AI clients. Not started by `up`; the client launches it:
+  #   docker compose run --rm -T -e API_TOKEN=rnw_... mcp
+  mcp:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    environment:
+      API_URL: http://backend:8000/api/v1
+      API_TOKEN: ${MCP_API_TOKEN:-}
+    stdin_open: true
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  exports_data:
+  documents_data:
+
+networks:
+  internal:
+    driver: bridge
