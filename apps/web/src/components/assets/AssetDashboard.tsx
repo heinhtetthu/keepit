@@ -31,7 +31,7 @@ export default function AssetDashboard() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Bars title="By type" rows={data.by_type.map((t) => ({ label: t.name, value: t.count, to: `/assets?type=${encodeURIComponent(t.name)}` }))} />
         <Bars title="By business unit" rows={data.by_business_unit.map((t) => ({ label: t.name, value: t.count }))} />
-        <Bars title="By age" rows={['< 1 yr', '1–3 yrs', '3–5 yrs', '5+ yrs', 'Unknown'].filter((k) => data.by_age[k]).map((k) => ({ label: k, value: data.by_age[k] }))} />
+        <Bars title="By age" rows={['< 1 yr', '1-3 yrs', '3-5 yrs', '5+ yrs', 'Unknown'].filter((k) => data.by_age[k]).map((k) => ({ label: k, value: data.by_age[k] }))} />
       </div>
       {data.repair_costs_12m.length > 0 && (
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Repair spend, last 12 months</CardTitle></CardHeader><CardContent>

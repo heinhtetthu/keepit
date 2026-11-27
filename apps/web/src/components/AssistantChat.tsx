@@ -54,7 +54,7 @@ export default function AssistantChat() {
     document.addEventListener('keydown', escape)
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape) }
   }, [open])
-  useEffect(() => {  // grow the box with the text (1–4 lines)
+  useEffect(() => {  // grow the box with the text (1 to 4 lines)
     const el = input.current
     if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 112)}px` }
   }, [draft])
@@ -159,12 +159,11 @@ export default function AssistantChat() {
         </section>
       )}
 
-      <button onClick={() => setOpen(!open)} aria-label={open ? 'Close assistant' : 'Open assistant'} aria-expanded={open}
-        className={cn('press flex h-12 items-center gap-2 rounded-2xl border px-3.5 text-sm font-medium backdrop-blur-md transition-all duration-200',
+      <button onClick={() => setOpen(!open)} aria-label={open ? `Close Ask ${brand}` : `Ask ${brand}`} title={open ? 'Close' : `Ask ${brand}`} aria-expanded={open}
+        className={cn('press flex h-11 w-11 items-center justify-center rounded-2xl border backdrop-blur-md transition-all duration-200',
           open ? 'border-transparent bg-primary text-primary-foreground shadow-lift'
             : 'border-primary/25 bg-primary/10 text-primary shadow-soft hover:border-transparent hover:bg-primary hover:text-primary-foreground hover:shadow-lift')}>
         {open ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-        <span className={cn('hidden sm:inline', open && 'sm:hidden')}>Ask {brand}</span>
       </button>
     </div>
   )

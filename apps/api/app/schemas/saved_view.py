@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field
 class SavedViewCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     record_type_id: int | None = None
-    scope: Literal["records", "assets"] = "records"
+    # "records" (with record_type_id) or a list key such as "assets", "employees", "borrows".
+    scope: str = Field(default="records", pattern=r"^[a-z][a-z0-9_-]{1,19}$")
     filters: dict[str, Any] | None = None
     sort: dict[str, Any] | None = None
     visible_columns: list[str] | None = None

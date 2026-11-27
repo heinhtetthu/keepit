@@ -20,6 +20,7 @@ import SeatDialog, { type SeatMode } from '../components/SeatDialog'
 import { Expiry, Switch } from '../components/DynamicTable'
 import type { RecordDetailResponse, RecordType, RecordAssignment } from '../types'
 import { Select } from '@/components/ui/select'
+import EntityHistory from '@/components/history/EntityHistory'
 
 interface Renewal {
   id: number
@@ -72,7 +73,7 @@ export default function RecordDetail() {
   const [showEdit, setShowEdit] = useState(false)
   const [showRenew, setShowRenew] = useState(false)
   const [seatMode, setSeatMode] = useState<SeatMode | null>(null)
-  const [historyTab, setHistoryTab] = useState<'ownership' | 'renewals'>('ownership')
+  const [historyTab, setHistoryTab] = useState<'ownership' | 'renewals' | 'activity'>('ownership')
   const [editingRenewal, setEditingRenewal] = useState<Renewal | null>(null)
   const [editingAssignment, setEditingAssignment] = useState<RecordAssignment | null>(null)
 
@@ -178,6 +179,7 @@ export default function RecordDetail() {
   const shownInHeader = new Set([sf.assignee?.id, sf.email?.id, sf.expiry?.id, sf.autoRenew?.id, sf.currency?.id, sf.cost?.id, cycleField?.field_id].filter(Boolean) as number[])
   if (!tracked) { shownInHeader.delete(sf.assignee?.id as number); shownInHeader.delete(sf.email?.id as number) }
   const backTo = `/records/${typeSlug || record.record_type_slug}`
+  const shownHistoryTab = !tracked && historyTab === 'ownership' ? 'renewals' : historyTab
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -307,16 +309,18 @@ export default function RecordDetail() {
       {/* History */}
       <section className="rounded-xl border bg-white">
         <div className="flex gap-1 border-b px-2">
-          {(tracked ? (['ownership', 'renewals'] as const) : (['renewals'] as const)).map((t) => (
+          {(tracked ? (['ownership', 'renewals', 'activity'] as const) : (['renewals', 'activity'] as const)).map((t) => (
             <button key={t} onClick={() => setHistoryTab(t)} className={cn(
               '-mb-px border-b-2 px-3 py-3 text-sm font-medium',
-              (tracked ? historyTab : 'renewals') === t ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800',
+              shownHistoryTab === t ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800',
             )}>
-              {t === 'ownership' ? `Who had it (${ownership.length})` : `Renewals (${renewals.length})`}
+              {t === 'ownership' ? `Who had it (${ownership.length})` : t === 'renewals' ? `Renewals (${renewals.length})` : 'Activity'}
             </button>
           ))}
         </div>
-        {tracked && historyTab === 'ownership' ? (
+        {shownHistoryTab === 'activity' ? (
+          <EntityHistory entity="record" id={record.id} className="rounded-none border-0" />
+        ) : shownHistoryTab === 'ownership' ? (
           <ol className="px-4 py-3">
             {ownership.map((a, i) => (
               <li key={a.id} className="group relative flex gap-3 pb-4 last:pb-0">

@@ -25,6 +25,8 @@ class EmployeeCreate(BaseModel):
     # Deprecated single-unit input, kept for compatibility with existing clients.
     business_unit: str | None = Field(default=None, max_length=100)
     title: str | None = Field(default=None, max_length=100)
+    department: str | None = Field(default=None, max_length=100)
+    country: str | None = Field(default=None, max_length=100)
     active: bool = True
     username: str | None = Field(default=None, max_length=100)
     phone: str | None = Field(default=None, max_length=50)
@@ -46,6 +48,8 @@ class EmployeeUpdate(BaseModel):
     business_units: list[str] | None = None
     business_unit: str | None = Field(default=None, max_length=100)
     title: str | None = Field(default=None, max_length=100)
+    department: str | None = Field(default=None, max_length=100)
+    country: str | None = Field(default=None, max_length=100)
     active: bool | None = None
     username: str | None = Field(default=None, max_length=100)
     phone: str | None = Field(default=None, max_length=50)
@@ -69,6 +73,8 @@ class EmployeeResponse(BaseModel):
     email: str | None
     business_units: list[str] = []
     title: str | None
+    department: str | None = None
+    country: str | None = None
     active: bool
     username: str | None = None
     phone: str | None = None
@@ -96,6 +102,7 @@ class EmployeeImportResponse(BaseModel):
 class EmployeeBulkUpdate(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=1000)
     business_units: list[str] | None = None
+    department: str | None = Field(default=None, max_length=100)
     active: bool | None = None
 
 

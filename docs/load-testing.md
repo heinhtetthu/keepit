@@ -1,4 +1,4 @@
-# Load test findings — November 4, 2026
+# Load test findings - November 4, 2026
 
 Tests used synthetic data in separate Docker containers and a separate network.
 The production database was never seeded, reset, or benchmarked. No notification

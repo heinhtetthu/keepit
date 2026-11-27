@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1 import help
+from app.api.v1 import history
+from app.api.v1 import departments
 from app.api.v1 import security
 from app.api.v1 import operations
 from app.api.v1 import report_jobs
@@ -23,6 +25,7 @@ api_router.include_router(records.router)
 api_router.include_router(assignments.router)
 api_router.include_router(employees.router)
 api_router.include_router(business_units.router)
+api_router.include_router(departments.router)
 api_router.include_router(search.router)
 api_router.include_router(views.router)
 api_router.include_router(import_records.router)
@@ -38,3 +41,4 @@ api_router.include_router(borrows.router)
 api_router.include_router(documents.router)
 api_router.include_router(reference.router)
 api_router.include_router(workspace.router)
+api_router.include_router(history.router)

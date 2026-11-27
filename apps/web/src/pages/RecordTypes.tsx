@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Settings2, Trash2, X, Plus, CalendarClock, ChevronUp, ChevronDown, Bot, Pencil, TriangleAlert } from 'lucide-react'
@@ -13,7 +13,9 @@ import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '../store/auth'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toaster'
-import { useViewMode, ViewSwitcher, Pager, VIEW_PAGE_SIZE } from '../components/ViewSwitcher'
+import { useViewMode, ViewSwitcher } from '../components/ViewSwitcher'
+import { TablePager } from '../components/table_shell'
+import { DataTable, EmptyRows, TableToolbar, clientRows, filterField, useTableState, type Column, type SortDef } from '@/components/data-table'
 import type { RecordType, RecordField, TelegramBot } from '../types'
 
 /* Class for a record-type name that opens its records when permitted */
@@ -411,6 +413,16 @@ function FieldManagerModal({ recordType, onClose, onAddField, onDeleteField, onE
 
 /* ---------------- Page ---------------- */
 
+const TYPE_SORTS: SortDef[] = [
+  { id: 'name', label: 'Name' }, { id: 'description', label: 'Description' }, { id: 'fields', label: 'Fields', kind: 'number' },
+  { id: 'reminders', label: 'Reminders' }, { id: 'status', label: 'Status' },
+]
+/* Column picker choices for the details view (cells are built inside the page). */
+const TYPE_COLUMNS = [
+  { id: 'name', label: 'Type', locked: true }, { id: 'description', label: 'Description' }, { id: 'fields', label: 'Fields' },
+  { id: 'reminders', label: 'Reminders' }, { id: 'bot', label: 'Reminder bot' }, { id: 'ownership', label: 'Ownership' }, { id: 'status', label: 'Status' },
+]
+
 export default function RecordTypes() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -433,8 +445,8 @@ export default function RecordTypes() {
   const [editingType, setEditingType] = useState<RecordType | null>(null)
   const [deletingType, setDeletingType] = useState<RecordType | null>(null)
   const [viewMode, setViewMode] = useViewMode('record-types')
-  const [page, setPage] = useState(1)
-  const changeViewMode = (m: typeof viewMode) => { setViewMode(m); setPage(1) }
+  const t = useTableState({ key: 'record-types', defaultSort: 'name', defaultColumns: ['description', 'fields', 'reminders', 'status'] })
+  const changeViewMode = (m: typeof viewMode) => { setViewMode(m); t.setPage(1) }
 
   const { data: recordTypes, isLoading, error } = useQuery<RecordType[]>({
     queryKey: ['record-types'],
@@ -564,9 +576,20 @@ const setReminderMutation = useMutation({
   const busy = addFieldMutation.isPending || deleteFieldMutation.isPending || setReminderMutation.isPending || reorderMutation.isPending
 
   const allTypes = recordTypes || []
-  const pageCount = Math.max(1, Math.ceil(allTypes.length / VIEW_PAGE_SIZE))
-  const curPage = Math.min(page, pageCount)
-  const shownTypes = allTypes.slice((curPage - 1) * VIEW_PAGE_SIZE, curPage * VIEW_PAGE_SIZE)
+  const botName = (id: number | null) => (bots || []).find((b) => b.id === id)?.name ?? null
+  const filterFields = useMemo(() => [
+    filterField('status', 'Status', 'select', [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]),
+    filterField('reminders', 'Reminders', 'select', [{ value: 'on', label: 'Reminders on' }, { value: 'off', label: 'Reminders off' }]),
+    filterField('track_ownership', 'Tracks ownership', 'boolean'),
+    ...(bots?.length ? [filterField('bot', 'Reminder bot', 'select', bots.map((b) => ({ value: String(b.id), label: b.name })))] : []),
+  ], [bots])
+  const typeValue = (rt: RecordType, slug: string): unknown => ({
+    name: rt.name, description: rt.description, fields: rt.fields?.length || 0, status: rt.active ? 'active' : 'inactive',
+    reminders: rt.reminder_field_id ? 'on' : 'off', track_ownership: !!rt.track_ownership, bot: rt.telegram_bot_id ? String(rt.telegram_bot_id) : null,
+  } as Record<string, unknown>)[slug]
+  const view = clientRows(allTypes, t, filterFields, typeValue, (rt) => `${rt.name} ${rt.description ?? ''} ${rt.slug}`)
+  const shownTypes = view.rows
+  const pager = { page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'record types' }
 
   /* Open the type's record list for users who can browse records */
   const openRecords = (slug: string) => canViewRecords && navigate(`/records/${slug}`)
@@ -636,8 +659,17 @@ const setReminderMutation = useMutation({
     if (isLoading) {
       return <div className="text-gray-500">Loading...</div>
     }
+    const footer = (
+      <div className="flex shrink-0 items-center rounded-xl border bg-gray-50/70 px-4 py-2 shadow-soft">
+        <TablePager shown={shownTypes.length} total={pager.total} noun={pager.noun} page={pager.page} pages={pager.pages} onPage={pager.onPage} pageSize={pager.pageSize} onPageSize={pager.onPageSize} />
+      </div>
+    )
+    if (viewMode !== 'details' && !shownTypes.length) {
+      return <div className="rounded-lg border bg-white"><EmptyRows title={allTypes.length ? 'No record types match' : 'No record types yet'} hint={allTypes.length ? undefined : ''} /></div>
+    }
     if (viewMode === 'thumbnail') {
       return (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {shownTypes.map((rt) => (
             <Card key={rt.id} className="group hover:shadow-md transition-shadow">
@@ -668,10 +700,13 @@ const setReminderMutation = useMutation({
             </Card>
           ))}
         </div>
+        {footer}
+        </>
       )
     }
     if (viewMode === 'list') {
       return (
+        <>
         <div className="border rounded-lg bg-white divide-y shadow-sm">
           {shownTypes.map((rt) => (
             <div key={rt.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-gray-50 transition-colors">
@@ -693,51 +728,38 @@ const setReminderMutation = useMutation({
             </div>
           ))}
         </div>
+        {footer}
+        </>
       )
     }
     // details
+    const columns: Column<RecordType>[] = [
+      { id: 'name', label: 'Type', sort: 'name', locked: true, render: (rt) => (
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-md bg-gray-50 border flex items-center justify-center shrink-0">
+            <TypeIcon icon={rt.icon} className="h-4 w-4 text-gray-600" />
+          </div>
+          <button className={nameLinkCls(canViewRecords)} onClick={(e) => { e.stopPropagation(); openRecords(rt.slug) }} title={rt.name}>{rt.name}</button>
+        </div>
+      ) },
+      { id: 'description', label: 'Description', sort: 'description', className: 'max-w-[320px] truncate text-gray-500', render: (rt) => <span title={rt.description || ''}>{rt.description || 'No description'}</span> },
+      { id: 'fields', label: 'Fields', sort: 'fields', render: (rt) => fieldsChip(rt) },
+      { id: 'reminders', label: 'Reminders', sort: 'reminders', render: (rt) => remindersChip(rt, true) },
+      { id: 'bot', label: 'Reminder bot', render: (rt) => botName(rt.telegram_bot_id) || <span className="text-gray-400">-</span> },
+      { id: 'ownership', label: 'Ownership', render: (rt) => rt.track_ownership ? 'Tracked' : <span className="text-gray-400">-</span> },
+      { id: 'status', label: 'Status', sort: 'status', render: (rt) => <Badge variant={rt.active ? 'success' : 'secondary'}>{rt.active ? 'Active' : 'Inactive'}</Badge> },
+    ]
     return (
-      <div className="border rounded-lg bg-white overflow-hidden shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b text-left text-xs text-gray-500">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Type</th>
-              <th className="px-4 py-2.5 font-medium">Description</th>
-              <th className="px-4 py-2.5 font-medium">Fields</th>
-              <th className="px-4 py-2.5 font-medium">Reminders</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {shownTypes.map((rt) => (
-              <tr key={rt.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-md bg-gray-50 border flex items-center justify-center shrink-0">
-                      <TypeIcon icon={rt.icon} className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <button className={nameLinkCls(canViewRecords)} onClick={() => openRecords(rt.slug)} title={rt.name}>{rt.name}</button>
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 text-gray-500 max-w-[320px] truncate" title={rt.description || ''}>{rt.description || 'No description'}</td>
-                <td className="px-4 py-2.5 text-gray-600">{fieldsChip(rt)}</td>
-                <td className="px-4 py-2.5">{remindersChip(rt, true)}</td>
-                <td className="px-4 py-2.5">
-                  <Badge variant={rt.active ? 'success' : 'secondary'}>{rt.active ? 'Active' : 'Inactive'}</Badge>
-                </td>
-                <td className="px-4 py-2.5 text-right">{typeActions(rt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable rows={shownTypes} rowKey={(rt) => rt.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        onRowClick={canViewRecords ? (rt) => openRecords(rt.slug) : undefined} actions={(rt) => typeActions(rt)}
+        empty={<EmptyRows title={allTypes.length ? 'No record types match' : 'No record types yet'} hint={allTypes.length ? undefined : canCreateType ? 'Create one to start tracking renewals.' : ''} />}
+        pager={pager} />
     )
   })()
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Record Types</h1>
           <p className="text-sm text-gray-500">
@@ -751,16 +773,16 @@ const setReminderMutation = useMutation({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ViewSwitcher mode={viewMode} onChange={changeViewMode} />
           {canCreateType && <Button onClick={() => setShowCreate(true)}>+ Create Record Type</Button>}
         </div>
       </div>
 
-      {body}
+      <TableToolbar state={t} searchPlaceholder="Search record types…" filterFields={filterFields} sorts={TYPE_SORTS}
+        columns={viewMode === 'details' ? TYPE_COLUMNS : undefined}>
+        <ViewSwitcher mode={viewMode} onChange={changeViewMode} />
+      </TableToolbar>
 
-      {allTypes.length > 0 && allTypes.length > VIEW_PAGE_SIZE && (
-        <Pager page={curPage} pages={pageCount} onPage={setPage} />
-      )}
+      {body}
 
       {/* Manage fields modal */}
       {managing && (

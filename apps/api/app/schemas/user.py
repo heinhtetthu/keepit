@@ -69,6 +69,7 @@ class UserResponse(BaseModel):
     name: str
     username: str | None = None
     has_avatar: bool = False
+    mfa_enabled: bool = False
     is_active: bool
     is_superuser: bool
     last_login: datetime | None

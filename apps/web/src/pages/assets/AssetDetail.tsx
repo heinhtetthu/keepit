@@ -12,15 +12,16 @@ import QrDialog from '@/components/assets/QrDialog'
 import { AssignDialog, BorrowDialog, MaintenanceDialog, RepairDialog } from '@/components/assets/ActionDialogs'
 import { AssignmentBadge, ConditionBadge, EmptyState, Tabs, useCan, useConfirm } from '@/components/assets/shared'
 import { LinkedDocuments } from '@/components/documents/DocumentDialogs'
+import EntityHistory from '@/components/history/EntityHistory'
 
-type Tab = 'history' | 'repairs' | 'maintenance' | 'borrows' | 'documents'
+type Tab = 'assignments' | 'repairs' | 'maintenance' | 'borrows' | 'documents' | 'activity'
 
 export default function AssetDetail() {
   const id = Number(useParams().id)
   const navigate = useNavigate()
   const can = useCan()
   const { data: a, isLoading, error } = useAsset(id)
-  const [tab, setTab] = useState<Tab>('history')
+  const [tab, setTab] = useState<Tab>('assignments')
   const [dialog, setDialog] = useState<null | 'edit' | 'assign' | 'repair' | 'maintenance' | 'borrow' | 'qr'>(null)
   const [repair, setRepair] = useState<Repair | null>(null)
   const [maint, setMaint] = useState<Maintenance | null>(null)
@@ -74,9 +75,9 @@ export default function AssetDetail() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2"><CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm sm:grid-cols-3">
-          <Info label="Holder">{a.employee ? <Link className="text-primary hover:underline" to={`/employees/${a.employee.id}`}>{a.employee.name}</Link> : '—'}</Info>
-          <Info label="Location">{a.location || '—'}</Info>
-          <Info label="Supplier">{a.supplier || '—'}</Info>
+          <Info label="Holder">{a.employee ? <Link className="text-primary hover:underline" to={`/employees/${a.employee.id}`}>{a.employee.name}</Link> : '-'}</Info>
+          <Info label="Location">{a.location || '-'}</Info>
+          <Info label="Supplier">{a.supplier || '-'}</Info>
           <Info label="Purchased">{formatDate(a.purchase_date)}</Info>
           <Info label="Cost">{formatMoney(a.purchase_cost, a.currency)}</Info>
           <Info label="Warranty"><span className={warrantyLeft !== null && warrantyLeft >= 0 && warrantyLeft <= 30 ? 'font-medium text-amber-700' : ''}>{formatDate(a.warranty_end_date)}{warrantyLeft !== null && warrantyLeft >= 0 && ` (${warrantyLeft}d)`}{warrantyLeft !== null && warrantyLeft < 0 && ' (expired)'}</span></Info>
@@ -89,12 +90,13 @@ export default function AssetDetail() {
       </div>
 
       <Tabs value={tab} onChange={setTab} tabs={[
-        { key: 'history', label: 'Assignments', count: a.assignments.length }, { key: 'repairs', label: 'Repairs', count: a.repairs.length },
+        { key: 'assignments', label: 'Assignments', count: a.assignments.length }, { key: 'repairs', label: 'Repairs', count: a.repairs.length },
         { key: 'maintenance', label: 'Maintenance', count: a.maintenance.length }, { key: 'borrows', label: 'Borrows', count: a.borrows.length },
         ...(can('document.view') ? [{ key: 'documents' as const, label: 'Documents' }] : []),
+        { key: 'activity' as const, label: 'History' },
       ]} />
 
-      {tab === 'history' && (a.assignments.length === 0 ? <EmptyState title="Never assigned" /> : (
+      {tab === 'assignments' && (a.assignments.length === 0 ? <EmptyState title="Never assigned" /> : (
         <List rows={a.assignments.map((h) => ({
           key: h.id, main: h.employee_id ? <Link className="hover:underline" to={`/employees/${h.employee_id}`}>{h.employee_name}</Link> : h.employee_name,
           sub: `${formatDate(h.assigned_from)} → ${h.assigned_to ? formatDate(h.assigned_to) : 'now'}${h.remark ? ` · ${h.remark}` : ''}`,
@@ -121,6 +123,7 @@ export default function AssetDetail() {
         }))} />
       ))}
       {tab === 'documents' && <LinkedDocuments link={{ entity_type: 'asset', entity_id: a.id }} />}
+      {tab === 'activity' && <EntityHistory entity="asset" id={a.id} />}
 
       {dialog === 'edit' && <AssetFormDialog asset={a} onClose={() => setDialog(null)} />}
       {dialog === 'assign' && <AssignDialog asset={a} onClose={() => setDialog(null)} />}

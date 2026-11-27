@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAccessCatalog, type LevelInfo } from './AccessDialog'
 import { cn } from '@/lib/utils'
 
-/** "What does each level mean?" — side-by-side comparison for Assets and Records. */
+/** "What does each level mean?": side-by-side comparison for Assets and Records. */
 export default function RolesExplained() {
   const { data: cat } = useAccessCatalog()
   const [area, setArea] = useState<'assets' | 'records'>('assets')
@@ -20,7 +20,7 @@ export default function RolesExplained() {
           <div role="tablist" className="ml-auto flex rounded-lg bg-gray-100 p-0.5 text-sm font-medium">
             {([['assets', 'Assets', Laptop], ['records', 'Records', Database]] as const).map(([k, label, I]) => (
               <button key={k} role="tab" aria-selected={area === k} onClick={() => setArea(k)}
-                className={cn('press inline-flex items-center gap-1.5 rounded-md px-3 py-1', area === k ? 'bg-white text-primary shadow-soft' : 'text-gray-500')}><I className="h-3.5 w-3.5" />{label}</button>
+                className={cn('press inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1', area === k ? 'bg-white text-primary shadow-soft' : 'text-gray-500')}><I className="h-3.5 w-3.5" />{label}</button>
             ))}
           </div>
         </div>
@@ -30,7 +30,7 @@ export default function RolesExplained() {
         <div key={area} className="grid animate-page-in gap-3 md:grid-cols-3">
           {levels.map((l) => (
             <div key={l.key} className="rounded-xl border p-3">
-              <p className="text-sm font-semibold text-gray-900">{l.title}</p>
+              <p className="whitespace-nowrap text-sm font-semibold text-gray-900">{l.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-gray-600">{l.description}</p>
               {l.cannot.length > 0 && <p className="mt-2 text-[11px] text-gray-500"><span className="font-medium">Not included:</span> {l.cannot.join('; ')}.</p>}
             </div>
@@ -39,7 +39,7 @@ export default function RolesExplained() {
         <div className="overflow-x-auto rounded-xl border">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-[11px] uppercase tracking-wider text-gray-500">
-              <tr><th className="px-3 py-2">Can…</th>{levels.map((l) => <th key={l.key} className="px-3 py-2 text-center">{l.title}</th>)}</tr>
+              <tr><th className="whitespace-nowrap px-3 py-2">Can…</th>{levels.map((l) => <th key={l.key} className="whitespace-nowrap px-3 py-2 text-center">{l.title}</th>)}</tr>
             </thead>
             <tbody className="divide-y">
               {rows.map((r) => (
@@ -52,9 +52,9 @@ export default function RolesExplained() {
         </div>
         {area === 'records' && <p className="text-xs text-gray-500"><span className="font-medium text-gray-700">Per record type:</span> {cat.grants.description} Example: Records Editor with Licenses = Edit and Domains = View can renew licenses but only look at domains.</p>}
         <div className="grid gap-2 text-xs text-gray-600 sm:grid-cols-3">
-          <p className="rounded-lg bg-gray-50 p-2.5"><span className="font-medium text-gray-900">{cat.workspace.title}:</span> {cat.workspace.description}</p>
-          <p className="rounded-lg bg-gray-50 p-2.5"><span className="font-medium text-gray-900">{cat.assistant.title}:</span> {cat.assistant.description}</p>
-          <p className="rounded-lg bg-gray-50 p-2.5"><span className="font-medium text-gray-900">{cat.superuser.title}:</span> {cat.superuser.description}</p>
+          <p className="rounded-lg bg-gray-50 p-2.5"><span className="whitespace-nowrap font-medium text-gray-900">{cat.workspace.title}:</span> {cat.workspace.description}</p>
+          <p className="rounded-lg bg-gray-50 p-2.5"><span className="whitespace-nowrap font-medium text-gray-900">{cat.assistant.title}:</span> {cat.assistant.description}</p>
+          <p className="rounded-lg bg-gray-50 p-2.5"><span className="whitespace-nowrap font-medium text-gray-900">{cat.superuser.title}:</span> {cat.superuser.description}</p>
         </div>
       </CardContent>
     </Card>

@@ -123,3 +123,51 @@ async def test_ai_failure_returns_labelled_local_fallback(client, monkeypatch):
     # The failed AI call/cooldown cannot block subsequent built-in questions.
     assert (await ask(client, headers, 'How do I customize reminder messages?')).json()['source'] == 'guide'
     assert (await ask(client, headers, 'Hello')).json()['source'] == 'builtin'
+
+
+EM, EN = chr(0x2014), chr(0x2013)
+
+
+def test_strip_dashes_picks_a_fitting_replacement():
+    assert answers.strip_dashes(f'Pages 1{EN}3 and 2020{EM}2021') == 'Pages 1-3 and 2020-2021'
+    assert answers.strip_dashes(f'Laptops {EM} the good kind') == 'Laptops, the good kind'
+    assert answers.strip_dashes(f'Note{EM}this matters') == 'Note, this matters'
+    assert answers.strip_dashes(f'London{EN}Paris') == 'London-Paris'
+    assert answers.strip_dashes(f'{EM} first\n{EN} second') == '- first\n- second'
+    assert answers.strip_dashes(f'Summary {EM}\nbody') == 'Summary:\nbody'
+    assert answers.strip_dashes('plain - hyphen') == 'plain - hyphen'
+    payload = answers.sanitize_reply({'answer': f'a {EM} b', 'table': {'rows': [{'name': f'x{EN}y'}]}, 'n': 3})
+    assert payload == {'answer': 'a, b', 'table': {'rows': [{'name': 'x-y'}]}, 'n': 3}
+
+
+async def test_every_answer_is_free_of_em_and_en_dashes(client, monkeypatch):
+    headers = await login(client)
+    monkeypatch.setattr(get_settings(), 'OPENAI_API_KEY', 'test-key')
+    monkeypatch.setattr(get_settings(), 'OPENAI_MODEL', 'test-model')
+
+    original = assistant.ask_openai
+
+    async def dashed(messages, context):
+        return f'Two steps {EM} open Assets, then 1{EN}3 filters.'
+    monkeypatch.setattr(assistant, 'ask_openai', dashed)
+    from app.db.session import AsyncSessionLocal
+    from app.models.settings import SystemSetting
+    from sqlalchemy import delete
+    async with AsyncSessionLocal() as db:  # clear the per-user AI cooldown left by earlier tests
+        await db.execute(delete(SystemSetting).where(SystemSetting.key.like('ai_cooldown:%')))
+        await db.commit()
+    ai = (await ask(client, headers, 'Explain quantum physics')).json()
+    assert ai['source'] == 'ai' and ai['answer'] == 'Two steps, open Assets, then 1-3 filters.'
+    for question in ['Tell me a joke', 'What can you do?', 'How do I add a passkey?',
+                     'Which records expire in the next 30 days?', 'What expires in 5 days?', 'Show overdue records']:
+        body = (await ask(client, headers, question)).text
+        assert EM not in body and EN not in body and '\\u2014' not in body and '\\u2013' not in body, question
+    # The model is told not to use them either.
+    captured = {}
+
+    async def fake_completion(cfg, messages, **kw):
+        captured['system'] = messages[0]['content']
+        return f'ok {EM} done'
+    monkeypatch.setattr(assistant, 'chat_completion', fake_completion)
+    assert await original([], {}) == 'ok, done'
+    assert 'Never use em dashes or en dashes' in captured['system']

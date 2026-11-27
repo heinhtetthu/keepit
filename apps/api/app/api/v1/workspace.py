@@ -38,61 +38,142 @@ async def _put(db, key, value, description):
 
 # ---------------------------------------------------------------- AI provider
 class AISettings(BaseModel):
-    base_url: str = Field(default="", max_length=300)
+    provider: str | None = Field(default=None, max_length=30, description="Provider id from /settings/ai/providers; omit to infer from base_url")
+    base_url: str = Field(default="", max_length=300, description="Only used by the custom provider")
     model: str = Field(default="", max_length=200)
     api_key: str | None = Field(default=None, max_length=500, description="Omit to keep; empty string clears")
 
 
+class AIProbe(BaseModel):
+    provider: str | None = Field(default=None, max_length=30, description="Defaults to the saved provider")
+    model: str | None = Field(default=None, max_length=200)
+    api_key: str | None = Field(default=None, max_length=500, description="A just-pasted key; omit to use the saved key")
+
+
+def _check_base_url(url: str) -> None:
+    from urllib.parse import urlparse
+    u = urlparse(url.strip())
+    local = (u.hostname or "") in {"localhost", "127.0.0.1", "::1", "host.docker.internal", "ollama"}
+    if u.scheme != "https" and not (u.scheme == "http" and local and get_settings().AI_ALLOW_LOCAL_PROVIDER):
+        raise ValidationException("Use an https:// URL (set AI_ALLOW_LOCAL_PROVIDER=true to allow a local http model server)")
+    if not u.hostname:
+        raise ValidationException("Base URL needs a host name")
+
+
+def _provider_id(provider: str | None, base_url: str) -> str:
+    from app.services.ai import CUSTOM, PROVIDERS, provider_for_url
+    if provider is None:
+        return provider_for_url(base_url)
+    provider = provider.strip().lower()
+    if provider != CUSTOM and provider not in PROVIDERS:
+        raise ValidationException("Unknown AI provider")
+    return provider
+
+
 @router.get("/settings/ai")
 async def get_ai(db: AsyncSession = DB, user=Depends(require_superuser)):
-    from app.services.ai import get_ai_config
+    from app.services.ai import PROVIDERS, get_ai_config
     cfg = await get_ai_config(db)
-    return {"base_url": cfg.base_url, "model": cfg.model, "has_key": bool(cfg.api_key), "ready": cfg.ready}
+    label = PROVIDERS.get(cfg.provider, {}).get("label", "Custom (OpenAI-compatible)")
+    return {"provider": cfg.provider, "provider_label": label, "base_url": cfg.base_url, "model": cfg.model,
+            "has_key": bool(cfg.api_key), "ready": cfg.ready}
+
+
+@router.get("/settings/ai/providers")
+async def ai_providers(user=Depends(require_superuser)):
+    from app.services.ai import provider_catalogue
+    return provider_catalogue()
 
 
 @router.put("/settings/ai")
 async def put_ai(data: AISettings, db: AsyncSession = DB, user=Depends(require_superuser)):
-    if data.base_url:
-        from urllib.parse import urlparse
-        u = urlparse(data.base_url.strip())
-        local = (u.hostname or "") in {"localhost", "127.0.0.1", "::1", "host.docker.internal", "ollama"}
-        if u.scheme != "https" and not (u.scheme == "http" and local and get_settings().AI_ALLOW_LOCAL_PROVIDER):
-            raise ValidationException("Use an https:// URL (set AI_ALLOW_LOCAL_PROVIDER=true to allow a local http model server)")
-        if not u.hostname:
-            raise ValidationException("Base URL needs a host name")
-    await _put(db, "ai_base_url", data.base_url.strip().rstrip("/"), "AI provider base URL")
+    from app.services.ai import CUSTOM
+    provider = _provider_id(data.provider, data.base_url)
+    base_url = data.base_url.strip().rstrip("/") if provider == CUSTOM else ""
+    if provider == CUSTOM and base_url:
+        _check_base_url(base_url)
+    await _put(db, "ai_provider", provider, "AI provider")
+    await _put(db, "ai_base_url", base_url, "AI provider base URL (custom provider)")
     await _put(db, "ai_model", data.model.strip(), "AI model")
     if data.api_key is not None:
         from app.services.encryption import encrypt
         await _put(db, "ai_api_key", encrypt(data.api_key.strip()) if data.api_key.strip() else "", "AI API key (encrypted)")
-    await log_audit(db, "settings.ai", "settings", None, "AI provider", new_values={"base_url": data.base_url, "model": data.model,
-                    "key_changed": data.api_key is not None}, user_id=user.id)
+    await log_audit(db, "settings.ai", "settings", None, "AI provider", new_values={"provider": provider, "base_url": base_url,
+                    "model": data.model, "key_changed": data.api_key is not None}, user_id=user.id)
     return await get_ai(db, user)
+
+
+async def _probe_config(db, data: AIProbe):
+    """The saved config, overridden by the request. Named providers use their
+    fixed URL; the custom provider only ever uses its saved, validated URL."""
+    from app.services.ai import AIConfig, CUSTOM, PROVIDERS, get_ai_config
+    saved = await get_ai_config(db)
+    provider = _provider_id(data.provider, saved.base_url) if data.provider is not None else saved.provider
+    if provider == CUSTOM:
+        base_url = saved.base_url if saved.provider == CUSTOM else ""
+        if base_url:
+            _check_base_url(base_url)
+    else:
+        base_url = PROVIDERS[provider]["base_url"]
+    key = (data.api_key or "").strip() or saved.api_key
+    return AIConfig(base_url=base_url, api_key=key, model=(data.model or "").strip() or saved.model, provider=provider)
+
+
+@router.post("/settings/ai/models")
+async def ai_models(data: AIProbe, db: AsyncSession = DB, user=Depends(require_superuser)):
+    from app.services.ai import list_models
+    cfg = await _probe_config(db, data)
+    if not cfg.base_url:
+        return {"models": [], "source": "static", "message": "Save a base URL for the custom provider first."}
+    return await list_models(cfg)
+
+
+@router.post("/settings/ai/test")
+async def ai_test(data: AIProbe, db: AsyncSession = DB, user=Depends(require_superuser)):
+    from app.services.ai import test_connection
+    cfg = await _probe_config(db, data)
+    if not cfg.ready:
+        return {"ok": False, "message": "Choose a provider and model and add an API key first."}
+    return await test_connection(cfg)
 
 
 # ---------------------------------------------------------------- currency
 class CurrencySettings(BaseModel):
     default_currency: str = Field(min_length=3, max_length=10)
     rates: dict[str, float] = Field(default_factory=dict, description="Units of default currency per 1 unit of code")
+    rates_updated_at: dict[str, str] | None = Field(default=None, description="Ignored on write; the server records when each rate changed")
+
+
+async def _currency_payload(db) -> dict:
+    import json
+    return {"default_currency": await _get(db, "default_currency", "USD"),
+            "rates": json.loads(await _get(db, "exchange_rates", "{}")),
+            "rates_updated_at": json.loads(await _get(db, "exchange_rates_updated", "{}"))}
 
 
 @router.get("/settings/currency")
 async def get_currency(db: AsyncSession = DB, user=Depends(get_current_user)):
-    import json
-    return {"default_currency": await _get(db, "default_currency", "USD"),
-            "rates": json.loads(await _get(db, "exchange_rates", "{}"))}
+    return await _currency_payload(db)
 
 
 @router.put("/settings/currency")
 async def put_currency(data: CurrencySettings, db: AsyncSession = DB, user=Depends(require_permission("settings.edit"))):
     import json
-    rates = {k.strip().upper()[:10]: float(v) for k, v in data.rates.items() if k.strip()}
-    if any(v <= 0 for v in rates.values()):
+    from datetime import datetime, timezone
+    default = data.default_currency.strip().upper()
+    rates = {k.strip().upper()[:10]: float(v) for k, v in data.rates.items() if k.strip() and k.strip().upper() != default}
+    if any(not v > 0 or v == float("inf") for v in rates.values()):
         raise ValidationException("Exchange rates must be positive")
-    await _put(db, "default_currency", data.default_currency.strip().upper(), "Default currency")
+    before = await _currency_payload(db)
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    same_base = before["default_currency"] == default
+    updated = {code: (before["rates_updated_at"].get(code) if same_base and before["rates"].get(code) == rate else None) or now
+               for code, rate in rates.items()}
+    await _put(db, "default_currency", default, "Default currency")
     await _put(db, "exchange_rates", json.dumps(rates), "Exchange rates to default currency")
-    await log_audit(db, "settings.currency", "settings", None, "Currency", new_values={"default": data.default_currency, "rates": rates}, user_id=user.id)
-    return {"default_currency": data.default_currency.strip().upper(), "rates": rates}
+    await _put(db, "exchange_rates_updated", json.dumps(updated) if updated else "", "When each exchange rate last changed")
+    await log_audit(db, "settings.currency", "settings", None, "Currency", new_values={"default": default, "rates": rates}, user_id=user.id)
+    return {"default_currency": default, "rates": rates, "rates_updated_at": updated}
 
 
 # ---------------------------------------------------------------- asset alerts

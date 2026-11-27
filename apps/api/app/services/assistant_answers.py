@@ -12,6 +12,41 @@ from app.services.date_query import field_date
 from app.services.guide import visible_sections
 
 
+_DASHES = '\u2014\u2013\u2012\u2015'
+_RANGE = re.compile(r'(?<=\d)\s*[\u2013\u2014\u2012]\s*(?=\d)')
+_SPACED = re.compile(r'\s+[\u2014\u2013\u2012\u2015]+\s+')
+_LINE_START = re.compile(r'(?m)^(\s*)[\u2014\u2013\u2012\u2015]+\s*')
+_TRAILING_LABEL = re.compile(r'(?m)^([^\n]{1,60}?)[\u2014\u2013\u2012\u2015]+\s*$')
+
+
+def strip_dashes(text):
+    """Replace em and en dashes so assistant answers never contain them.
+
+    Number ranges become a hyphen (1-3), a dash used as a pause between words
+    becomes a comma, a dash ending a short label becomes a colon, a dash at the start of a line becomes a list hyphen and any
+    other dash becomes a plain hyphen."""
+    if not isinstance(text, str) or not any(d in text for d in _DASHES):
+        return text
+    text = _RANGE.sub('-', text)
+    text = _LINE_START.sub(lambda m: m.group(1) + '- ', text)
+    text = _TRAILING_LABEL.sub(lambda m: m.group(1).rstrip() + ':', text)
+    text = _SPACED.sub(', ', text)
+    text = re.sub(r'(?<=\w)[\u2014\u2015]+(?=\w)', ', ', text)  # unspaced em dash: a pause
+    text = re.sub('[' + _DASHES + ']', '-', text)  # en dash in a compound, or a stray dash
+    return text.replace(',,', ',')
+
+
+def sanitize_reply(value):
+    """Apply strip_dashes to every string in an answer payload (answer, notice, table)."""
+    if isinstance(value, str):
+        return strip_dashes(value)
+    if isinstance(value, dict):
+        return {k: sanitize_reply(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [sanitize_reply(v) for v in value]
+    return value
+
+
 def reply(answer, source='builtin', **extra):
     return {'answer': answer, 'source': source, **extra}
 
@@ -79,7 +114,7 @@ def casual_answer(question, user=None):
     if q in {'help', 'what can you do', 'system guide', 'what can i ask', 'guide'}:
         return built_in_help(user)
     if re.fullmatch(r'(please )?(tell me |give me )?(a )?joke( please)?', q):
-        return reply('Why did the laptop sign up for a warranty? It wanted a little extra coverage before its next renewal.\n\nThat one comes from the built-in joke shelf—no AI credits were harmed.')
+        return reply('Why did the laptop sign up for a warranty? It wanted a little extra coverage before its next renewal.\n\nThat one comes from the built-in joke shelf, no AI credits were harmed.')
     if q in {'why do mondays exist', 'why monday', 'why mondays'}:
         return reply('Monday gives the weekend a dramatic ending. For calendar history you’ll need the optional AI connection; for overdue borrows and upcoming renewals, I’m already on duty.')
     return None
@@ -128,7 +163,7 @@ async def record_answer(db, user, question, type_id):
         return reply('Choose a window from 1 to 365 days, for example: “Which records expire in the next 30 days?”', 'records')
     # Reject unsupported time windows instead of silently answering for a different one.
     if re.search(r'\b(last|between|yesterday|this week|this month|next month|year|quarter)\b|\d{4}-\d{2}-\d{2}', q):
-        return reply('For exact dates or calendar-month reports, use Records or Reports. Built-in chat supports today, tomorrow, overdue, next week, or the next 1–365 days.', 'records')
+        return reply('For exact dates or calendar-month reports, use Records or Reports. Built-in chat supports today, tomorrow, overdue, next week, or the next 1 to 365 days.', 'records')
     days = int(days_match[1]) if days_match else 7 if 'next week' in q else 30
     start = today + timedelta(days=1) if 'tomorrow' in q else today
     end = start if 'tomorrow' in q or re.search(r'\btoday\b', q) else today + timedelta(days=days)
@@ -145,9 +180,9 @@ async def record_answer(db, user, question, type_id):
     count = (await db.execute(select(func.count()).select_from(dated).where(date_filter))).scalar() or 0
     rows = (await db.execute(select(dated).where(date_filter).order_by(dated.c.expiry, dated.c.id).limit(10))).all()
     window = f'before {today.isoformat()}' if overdue else f'{start.isoformat()} through {end.isoformat()} (inclusive)'
-    answer = f'{scope}: {count} records {"overdue" if overdue else "expiring"} — {window}.\n\n'
+    answer = f'{scope}: {count} records {"overdue" if overdue else "expiring"}, {window}.\n\n'
     if rows:
-        answer += '\n'.join(f'• {r.name} [{r.type_name}] — {r.expiry.isoformat()}\n  /records/{r.slug}/{r.id}' for r in rows)
+        answer += '\n'.join(f'• {r.name} [{r.type_name}]: {r.expiry.isoformat()}\n  /records/{r.slug}/{r.id}' for r in rows)
         if count > len(rows):
             answer += f'\n\nShowing the earliest {len(rows)} of {count} matches. Open Records for the full list.'
     else:
@@ -156,7 +191,7 @@ async def record_answer(db, user, question, type_id):
     result = reply(answer, 'records')
     if rows:
         result['table'] = {
-            'summary': f'{scope}: {count} records {"overdue" if overdue else "expiring"} — {window}.',
+            'summary': f'{scope}: {count} records {"overdue" if overdue else "expiring"}, {window}.',
             'rows': [{'name': r.name, 'type': r.type_name, 'date': r.expiry.isoformat(),
                       'url': f'/records/{r.slug}/{r.id}'} for r in rows],
             'note': (f'Showing the earliest {len(rows)} of {count} matches. Open Records for the full list.\n\n' if count > len(rows) else '')

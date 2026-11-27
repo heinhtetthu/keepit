@@ -1,6 +1,14 @@
 import pytest
 from datetime import date, timedelta
 
+import secrets
+
+
+def _pw() -> str:
+    """A throwaway password for users created in a test."""
+    return f"T{secrets.token_urlsafe(12)}9a!"
+
+
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 TODAY = date.today()
 
@@ -203,13 +211,14 @@ async def test_split_access_per_type(client):
     cat = (await client.get("/api/v1/users/access-catalog", headers=h)).json()
     assert [lv["key"] for lv in cat["assets"]["levels"]] == ["none", "viewer", "editor", "manager"]
     assert all(lv["description"] for lv in cat["records"]["levels"])
+    pw = _pw()
     u = (await client.post("/api/v1/users", json={"email": "mix@corp.com", "username": "mix", "name": "Mix",
-                                                  "password": "mixed-pass-123456"}, headers=h)).json()
+                                                  "password": pw}, headers=h)).json()
     body = {"assets": "viewer", "records": "editor", "grants": [
         {"record_type_id": types["License"], "access": "edit"}, {"record_type_id": types["Domain"], "access": "view"}]}
     prof = (await client.put(f"/api/v1/users/{u['id']}/access", json=body, headers=h)).json()
     assert prof["assets"] == "viewer" and prof["records"] == "editor" and len(prof["grants"]) == 2
-    mh = await _login(client, "mix@corp.com", "mixed-pass-123456")
+    mh = await _login(client, "mix@corp.com", pw)
     me = (await client.get("/api/v1/auth/me", headers=mh)).json()
     assert me["record_type_access"] == {str(types["License"]): "edit", str(types["Domain"]): "view"}
     lic = await client.post(f"/api/v1/records/by-type/{types['License']}", json={"name": "Office seat", "values": []}, headers=mh)

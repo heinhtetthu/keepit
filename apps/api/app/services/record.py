@@ -348,9 +348,12 @@ async def create_record(db: AsyncSession, record_type_id: int, data: RecordCreat
         .options(selectinload(Record.values).selectinload(RecordValue.field))
     )
     record = result.scalar_one()
+    detail = _serialize_detail(record, record_type, fields_by_id)
+    from app.services.history import record_snapshot
     await log_audit(db, "create", "record", record.id, record.name, user_id=user_id,
+                    new_values={"_snapshot": record_snapshot(detail, record_type.fields)},
                     details=f"Created {record_type.name} record")
-    return _serialize_detail(record, record_type, fields_by_id)
+    return detail
 
 
 async def update_record(db: AsyncSession, record_id: int, data: RecordUpdate, user_id: int | None = None) -> dict[str, Any]:
@@ -397,8 +400,10 @@ async def update_record(db: AsyncSession, record_id: int, data: RecordUpdate, us
         label_map = {f"field:{v['field_id']}": v["field_name"] for v in detail["values"]}
         secret_ids = {f'field:{f.id}' for f in record_type.fields if f.field_type == 'secret'}
         named_changes = {label_map.get(k, k): '[REDACTED]' if k in secret_ids else v for k, v in changes.items()}
+        from app.services.history import record_snapshot
         await log_audit(db, "update", "record", record_id, detail["name"], user_id=user_id,
-                        new_values=named_changes, details=f"Updated {detail['name']}")
+                        new_values={**named_changes, "_snapshot": record_snapshot(detail, record_type.fields)},
+                        details=f"Updated {detail['name']}")
     return detail
 
 
@@ -578,6 +583,8 @@ async def renew_record(db: AsyncSession, record_id: int, data: RenewalCreate, us
     db.add(renewal)
     await db.flush()
     await log_audit(db, "renew", "record", record_id, record.name, user_id=user_id,
+                    new_values={reminder_field.name: {"old": old_date.date().isoformat() if old_date else None,
+                                                      "new": new_date.isoformat()}},
                     details=f"Renewed {record.name}: {old_date.date() if old_date else 'none'} -> {new_date}")
 
     return {"record": await get_record(db, record_id), "renewal_id": renewal.id}

@@ -7,6 +7,8 @@ import { toast } from '@/components/ui/toaster'
 import { useAuthStore } from '../store/auth'
 import type { RecordType } from '../types'
 import { Select } from '@/components/ui/select'
+import { MessageSquareText } from 'lucide-react'
+import { TelegramBubble } from '@/components/renewals/RuleDialog'
 
 interface Settings {
   template: string | null
@@ -85,10 +87,15 @@ export default function ReminderMessageEditor({ recordType }: { recordType: Reco
   const updating = preview.isFetching || previewText !== text
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Telegram message · {recordType.name}</CardTitle>
-        <p className="text-sm text-gray-500">Shared by this type's reminder rules unless a rule has its own custom message.</p>
+    <Card className="animate-page-in">
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><MessageSquareText className="h-4 w-4" /></span>
+          <div className="min-w-0">
+            <CardTitle className="text-base">Shared Telegram message</CardTitle>
+            <p className="text-sm text-gray-500">Every {recordType.name} reminder sends this, unless the reminder has its own custom message.</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isPending && <p className="text-sm text-gray-500">Loading message…</p>}
@@ -98,12 +105,12 @@ export default function ReminderMessageEditor({ recordType }: { recordType: Reco
             <section className="min-w-0 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor={`message-${recordType.id}`} className="text-sm font-medium">Message template</label>
-                <span className="text-xs text-gray-500">{draft !== null ? 'Unsaved changes' : data.template ? 'Custom message' : 'Default message'}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs ${draft !== null ? 'bg-amber-50 text-amber-700' : data.template ? 'bg-violet-50 text-violet-700' : 'bg-gray-100 text-gray-500'}`}>{draft !== null ? 'Unsaved changes' : data.template ? 'Custom message' : 'Default message'}</span>
               </div>
               <textarea id={`message-${recordType.id}`} ref={textarea} value={text} readOnly={!canEdit}
                 maxLength={4096} onChange={e => setDraft(e.target.value)} rows={12}
                 className={`${inputClass} font-mono text-xs leading-relaxed`} />
-              <p className="text-xs text-gray-500">Insert a value at the cursor. Missing field values appear as —. An empty message uses the default.</p>
+              <p className="text-xs text-gray-500">Insert a value at the cursor. Missing field values appear as a dash. An empty message uses the default.</p>
               <details className="rounded-md border p-3 text-xs text-gray-500">
                 <summary className="cursor-pointer font-medium">Formatting help</summary>
                 <p className="mt-2">Use plain text or basic HTML: <code>{'<b>bold</b>, <i>italic</i>, <u>underline</u>, <s>strike</s>, <code>code</code>'}</code>.</p>
@@ -114,13 +121,13 @@ export default function ReminderMessageEditor({ recordType }: { recordType: Reco
               <div className="flex flex-wrap gap-1.5">
                 {data.variables.filter(v => v.kind === 'record').map(v => <button type="button" key={v.key}
                   disabled={!canEdit} title={`{${v.key}}`} onClick={() => insert(v.key)}
-                  className="rounded border bg-gray-50 px-2 py-1 text-xs hover:bg-gray-100 disabled:opacity-50">{v.label}</button>)}
+                  className="press rounded-full border bg-gray-50 px-2.5 py-1 text-xs hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-50">{v.label}</button>)}
               </div>
               <p className="text-xs font-medium text-gray-600">{recordType.name} fields</p>
               <div className="flex max-h-40 flex-wrap gap-1.5 overflow-auto">
                 {data.variables.filter(v => v.kind === 'field').map(v => <button type="button" key={v.key}
                   disabled={!canEdit} title={`{${v.key}} · {${v.alias}}`} onClick={() => insert(v.key)}
-                  className="rounded border px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50">{v.label}</button>)}
+                  className="press rounded-full border px-2.5 py-1 text-xs hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-50">{v.label}</button>)}
               </div>
             </section>
             <section className="min-w-0 space-y-3">
@@ -142,11 +149,9 @@ export default function ReminderMessageEditor({ recordType }: { recordType: Reco
               </label>
               <p className="text-xs text-gray-500">{recordId ? 'Uses current record values and expiry date.' : 'Uses example values; sample expiry follows the preview interval.'} Previewing sends no Telegram message.</p>
               {updating && <p role="status" className="text-xs text-gray-500">Updating preview…</p>}
-              {preview.error && !updating && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {(preview.error as any)?.response?.data?.error?.message || 'This message cannot be previewed.'}
-              </p>}
+              <TelegramBubble text={preview.data?.text} loading={updating}
+                error={preview.error && !updating ? ((preview.error as any)?.response?.data?.error?.message || 'This message cannot be previewed.') : null} />
               {preview.data && !preview.error && !updating && <>
-                <pre data-testid="telegram-message-preview" className="whitespace-pre-wrap break-words rounded-lg border bg-sky-50/40 p-4 text-sm font-sans leading-relaxed">{preview.data.text}</pre>
                 <p className="text-xs text-gray-500">Text preview · {preview.data.length}/4,096 · Telegram applies the supported HTML formatting.</p>
                 {preview.data.warnings.map(w => <p key={w} className="text-xs text-amber-700">{w}</p>)}
               </>}

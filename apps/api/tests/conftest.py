@@ -38,12 +38,20 @@ if not TEST_DATABASE_URL:
         os.path.join(ROOT, "test_account.py"),
         os.path.join(ROOT, "test_workspace.py"),
         os.path.join(ROOT, "test_rls.py"),
+        os.path.join(ROOT, "test_history.py"),
+        os.path.join(ROOT, "test_itlogs.py"),
+        os.path.join(ROOT, "test_upcoming_renewals.py"),
+        os.path.join(ROOT, "test_employees.py"),
+        os.path.join(ROOT, "test_list_filters_misc.py"),
+        os.path.join(ROOT, "test_audit_list.py"),
+        os.path.join(ROOT, "test_asset_reports.py"),
     ]
 else:
     # Isolated test key; never used by deployment or backup scripts.
     import base64
     os.environ.setdefault('DATA_ENCRYPTION_KEYS', base64.urlsafe_b64encode(b'0' * 32).decode())
-    os.environ.setdefault('SECRET_KEY', 'disposable-test-signing-key-at-least-32-characters')
+    import secrets
+    os.environ.setdefault('SECRET_KEY', secrets.token_urlsafe(48))  # fresh per run, never a fixed literal
     # Point the application at the test database before anything imports it.
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
     # RECORDS_TEST_RLS=1 runs the whole suite as the limited keepit_app role with

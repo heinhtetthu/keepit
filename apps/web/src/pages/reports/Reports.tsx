@@ -1,17 +1,19 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowDownUp, BarChart3, Boxes, CalendarClock, ChevronDown, ClipboardCheck, Download, FileDown, Handshake, Laptop, Search,
+  BarChart3, Boxes, CalendarClock, ChevronDown, ClipboardCheck, Download, FileDown, Handshake, Laptop,
   ShieldCheck, TrendingUp, Users, Wrench,
 } from 'lucide-react'
-import { errorMessage, formatDate, formatMoney, useApi, useReference, type AssetReport, type AssetReportKind } from '@workspace/core'
+import { errorMessage, formatDate, formatMoney, useApi, type AssetReport, type AssetReportKind } from '@workspace/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import Popover from '@/components/ui/popover'
 import { toast } from '@/components/ui/toaster'
-import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
+import {
+  DataTable, EmptyRows, TableToolbar, clientRows, filterField, useTableState, type Column, type SortDef,
+} from '@/components/data-table'
 import { useAuthStore } from '@/store/auth'
 import { cn } from '@/lib/utils'
 import type { RenewalSection } from './RenewalReports'
@@ -51,10 +53,7 @@ export default function Reports() {
       <section key={current.key} className="flex min-h-0 min-w-0 flex-1 animate-page-in flex-col gap-4">
         {ASSET_KINDS.has(current.key)
           ? <AssetReportView def={current} picker={picker} />
-          : <>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">{picker}</div>
-            <Suspense fallback={<div className="skeleton h-64" />}><RenewalReports section={current.key as RenewalSection} /></Suspense>
-          </>}
+          : <Suspense fallback={<div className="skeleton h-64" />}><RenewalReports section={current.key as RenewalSection} picker={picker} /></Suspense>}
       </section>
     </div>
   )
@@ -108,123 +107,128 @@ function rangeDates(key: string): { from?: string; to?: string } {
   if (key === 'next90') { const t = new Date(); t.setDate(now.getDate() + 90); return { from: iso(now), to: iso(t) } }
   return {}
 }
-const MONEY_KEYS = new Set(['cost', 'value'])
-const DATE_KEYS = new Set(['date', 'purchased', 'warranty_end', 'borrowed', 'due', 'returned'])
+type ColType = NonNullable<AssetReport['columns'][number]['type']>
+type Row = Record<string, string | number | null> & { __i: number }
+
+/** Per report: the column that is always shown, the default sort and the columns hidden at first. */
+const SETUP: Record<AssetReportKind, { lock: string; sort: string; order: 'asc' | 'desc'; columns: string[] }> = {
+  inventory: { lock: 'asset', sort: 'asset', order: 'asc', columns: ['type', 'holder', 'status', 'location', 'purchased', 'cost', 'warranty_end'] },
+  repairs: { lock: 'asset', sort: 'date', order: 'desc', columns: ['date', 'type', 'issue', 'vendor', 'status', 'cost'] },
+  maintenance: { lock: 'asset', sort: 'date', order: 'desc', columns: ['date', 'type', 'body', 'os', 'issues'] },
+  borrows: { lock: 'item', sort: 'borrowed', order: 'desc', columns: ['serial', 'borrower', 'borrowed', 'due', 'returned', 'state'] },
+  warranties: { lock: 'asset', sort: 'warranty_end', order: 'asc', columns: ['warranty_end', 'days_left', 'state', 'type', 'holder', 'location'] },
+  holders: { lock: 'employee', sort: 'count', order: 'desc', columns: ['title', 'business_unit', 'count', 'value', 'items'] },
+}
+const FILTER_TYPE: Record<ColType, string> = { text: 'text', choice: 'select', date: 'date', money: 'currency', number: 'integer' }
 const BADGE: Record<string, string> = {
   Overdue: 'bg-red-50 text-red-700', Expired: 'bg-red-50 text-red-700', 'In Progress': 'bg-amber-50 text-amber-700', 'In Repair': 'bg-amber-50 text-amber-700',
   'Within 30 days': 'bg-amber-50 text-amber-700', Out: 'bg-violet-50 text-violet-700', Borrowed: 'bg-violet-50 text-violet-700',
   Assigned: 'bg-blue-50 text-blue-700', Returned: 'bg-green-50 text-green-700', Complete: 'bg-green-50 text-green-700', Operational: 'bg-green-50 text-green-700',
   'Written-Off': 'bg-gray-100 text-gray-600', Unassigned: 'bg-gray-100 text-gray-600',
 }
+const dash = <span className="text-gray-300">-</span>
+
+function cell(key: string, type: ColType, row: Row) {
+  const v = row[key]
+  if (v === null || v === undefined || v === '') return dash
+  if (type === 'money') return formatMoney(v, (row.currency as string) || undefined)
+  if (type === 'date') return <span className="tabular-nums">{formatDate(String(v))}</span>
+  if (key === 'days_left') return <span className={cn('tabular-nums', Number(v) < 0 ? 'text-red-600' : Number(v) <= 30 ? 'text-amber-700' : '')}>{Number(v) < 0 ? `${-Number(v)} days ago` : `${v} days`}</span>
+  if (BADGE[String(v)]) return <span className={cn('inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', BADGE[String(v)])}>{v}</span>
+  if ((key === 'asset' || key === 'item') && row.asset_id) return <Link className="font-medium text-gray-900 hover:text-primary hover:underline" to={`/assets/${row.asset_id}`}>{v}</Link>
+  if (key === 'employee' && row.employee_id) return <Link className="font-medium text-gray-900 hover:text-primary hover:underline" to={`/employees/${row.employee_id}`}>{v}</Link>
+  if (key === 'asset' || key === 'item' || key === 'employee') return <span className="font-medium text-gray-900">{v}</span>
+  if (key === 'serial') return <span className="font-mono text-xs">{v}</span>
+  return String(v)
+}
 
 function AssetReportView({ def, picker }: { def: ReportDef; picker: ReactNode }) {
   const api = useApi()
-  const { data: ref } = useReference()
-  const [q, setQ] = useState('')
-  const [search, setSearch] = useState('')
-  const [type, setType] = useState('')
-  const [range, setRange] = useState(def.key === 'warranties' ? 'next90' : def.dated ? '90' : 'all')
+  const kind = def.key as AssetReportKind
+  const setup = SETUP[kind]
+  const t = useTableState({ key: `rpt-${kind}`, defaultSort: setup.sort, defaultOrder: setup.order, defaultColumns: setup.columns })
+  const [period, setPeriod] = useState(kind === 'warranties' ? 'next90' : def.dated ? '90' : 'all')
   const [custom, setCustom] = useState({ from: '', to: '' })
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = usePageSize('report-page-size', 25)
-  const dates = range === 'custom' ? { from: custom.from || undefined, to: custom.to || undefined } : rangeDates(range)
-  const params = { q: search || undefined, asset_type: type || undefined, ...(def.dated ? dates : {}) }
+  const [exporting, setExporting] = useState(false)
+  const dates = period === 'custom' ? { from: custom.from || undefined, to: custom.to || undefined } : rangeDates(period)
+  const params = def.dated ? dates : {}
   const { data, isLoading, isFetching, error } = useQuery<AssetReport>({
-    queryKey: ['asset-report', def.key, params], queryFn: () => api.reports.asset(def.key as AssetReportKind, params), placeholderData: (p) => p,
+    queryKey: ['asset-report', kind, params], queryFn: () => api.reports.asset(kind, params), placeholderData: (p) => p,
   })
-  useEffect(() => setPage(1), [def.key, search, type, range, custom.from, custom.to])
 
-  const rows = useMemo(() => {
-    const all = data?.rows ?? []
-    if (!sort) return all
-    return [...all].sort((a, b) => {
-      const x = a[sort.key], y = b[sort.key]
-      if (x === y) return 0
-      if (x === null || x === undefined) return 1
-      if (y === null || y === undefined) return -1
-      return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))) * sort.dir
-    })
-  }, [data, sort])
-  const pages = Math.max(1, Math.ceil(rows.length / pageSize))
-  const shown = rows.slice((page - 1) * pageSize, page * pageSize)
+  const cols = useMemo(() => (data?.columns ?? []).map((c) => ({ ...c, type: (c.type ?? 'text') as ColType })), [data])
+  const all = useMemo<Row[]>(() => (data?.rows ?? []).map((r, i) => ({ ...r, __i: i })), [data])
+  // Filters come from the report's own columns; choice filters list the values present in the rows.
+  const fields = useMemo(() => cols.map((c, i) => {
+    const options = c.type === 'choice'
+      ? [...new Set(all.map((r) => r[c.key]).filter((v) => v !== null && v !== undefined && v !== '').map(String))].sort((a, b) => a.localeCompare(b))
+      : []
+    return filterField(c.key, c.label, FILTER_TYPE[c.type], options, i)
+  }), [cols, all])
+  const columns = useMemo<Column<Row>[]>(() => cols.map((c) => ({
+    id: c.key, label: c.label, sort: c.key, locked: c.key === setup.lock,
+    align: c.type === 'money' || c.type === 'number' ? 'right' : undefined,
+    className: c.type === 'text' && !['asset', 'item', 'employee', 'serial'].includes(c.key) ? 'max-w-[18rem] truncate' : undefined,
+    render: (r: Row) => cell(c.key, c.type, r),
+  })), [cols, setup.lock])
+  const sorts = useMemo<SortDef[]>(() => cols.map((c) => ({ id: c.key, label: c.label, kind: c.type === 'date' ? 'date' : c.type === 'money' || c.type === 'number' ? 'number' : 'text' })), [cols])
 
+  const view = clientRows(all, { search: t.search, filters: t.filters, sort: t.sort, order: t.order, page: t.page, pageSize: t.pageSize },
+    fields, (r, k) => r[k], (r) => cols.map((c) => r[c.key] ?? '').join(' '))
+  const visibleKeys = cols.filter((c) => c.key === setup.lock || t.columns.includes(c.key)).map((c) => c.key)
+  const filtered = !!t.search || Object.keys(t.filters).length > 0
+
+  // The server applies the same search, filters, sort and columns, so the CSV holds what is on screen.
   const exportCsv = async () => {
+    setExporting(true)
     try {
-      const blob = await api.reports.assetCsv(def.key as AssetReportKind, params)
-      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${def.key}-${iso(new Date())}.csv` })
+      const hasFilters = Object.keys(t.filters).length > 0
+      const blob = await api.reports.assetCsv(kind, {
+        ...params, search: t.search || undefined, filters: hasFilters ? JSON.stringify(t.filters) : undefined,
+        sort: t.sort, order: t.order, columns: visibleKeys.join(','),
+      })
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${kind}-${iso(new Date())}.csv` })
       a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000)
-    } catch (e) { toast.error(errorMessage(e)) }
-  }
-  const cell = (key: string, v: string | number | null | undefined, row: Record<string, unknown>) => {
-    if (v === null || v === undefined || v === '') return <span className="text-gray-300">—</span>
-    if (MONEY_KEYS.has(key)) return formatMoney(v, (row.currency as string) || undefined)
-    if (DATE_KEYS.has(key)) return formatDate(String(v))
-    if (key === 'days_left') return <span className={Number(v) < 0 ? 'text-red-600' : Number(v) <= 30 ? 'text-amber-700' : ''}>{Number(v) < 0 ? `${-Number(v)} days ago` : `${v} days`}</span>
-    if (BADGE[String(v)]) return <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', BADGE[String(v)])}>{v}</span>
-    if ((key === 'asset' || key === 'item') && row.asset_id) return <Link className="font-medium text-gray-900 hover:text-primary hover:underline" to={`/assets/${row.asset_id}`}>{v}</Link>
-    if (key === 'employee' && row.employee_id) return <Link className="font-medium text-gray-900 hover:text-primary hover:underline" to={`/employees/${row.employee_id}`}>{v}</Link>
-    return String(v)
+    } catch (e) { toast.error(errorMessage(e)) } finally { setExporting(false) }
   }
 
   return (
     <>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {picker}
-        <form className="relative w-full sm:w-56" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()) }}>
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => setSearch(q.trim())} />
-        </form>
-        {def.key !== 'borrows' && (
-          <Select className="w-40" value={type} onChange={(e) => setType(e.target.value)} aria-label="Asset type">
-            <option value="">All types</option>{(ref?.asset_type ?? []).map((t) => <option key={t.id}>{t.name}</option>)}
-          </Select>
-        )}
         {def.dated && (
-          <Select className="w-40" value={range} onChange={(e) => setRange(e.target.value)} aria-label="Period">
-            {RANGES.filter((r) => def.key === 'warranties' || r.key !== 'next90').map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+          <Select className="w-40" value={period} onChange={(e) => { setPeriod(e.target.value); t.setPage(1) }} aria-label="Period">
+            {RANGES.filter((r) => kind === 'warranties' || r.key !== 'next90').map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
           </Select>
         )}
-        {def.dated && range === 'custom' && (
+        {def.dated && period === 'custom' && (
           <div className="flex items-center gap-2">
-            <Input type="date" className="w-40" value={custom.from} onChange={(e) => setCustom({ ...custom, from: e.target.value })} aria-label="From" />
-            <span className="text-gray-400">→</span>
-            <Input type="date" className="w-40" value={custom.to} onChange={(e) => setCustom({ ...custom, to: e.target.value })} aria-label="To" />
+            <Input type="date" className="h-9 w-40" value={custom.from} onChange={(e) => { setCustom({ ...custom, from: e.target.value }); t.setPage(1) }} aria-label="From" />
+            <span className="text-gray-400">to</span>
+            <Input type="date" className="h-9 w-40" value={custom.to} onChange={(e) => { setCustom({ ...custom, to: e.target.value }); t.setPage(1) }} aria-label="To" />
           </div>
         )}
-        <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.length} onClick={exportCsv}><Download className="h-4 w-4" />CSV</Button>
+        <Button variant="outline" size="sm" className="ml-auto" disabled={!view.total || exporting} onClick={exportCsv}
+          title={filtered ? 'Export the rows that match the current filters' : 'Export every row in this report'}>
+          <Download className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">{exporting ? 'Preparing…' : filtered ? `CSV (${view.total})` : 'CSV'}</span>
+        </Button>
       </div>
 
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{errorMessage(error)}</p>}
       <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
         {(data?.summary ?? [{ label: '', value: '' }, { label: '', value: '' }, { label: '', value: '' }]).map((s, i) => (
           <div key={i} className={cn('rounded-xl border bg-white px-3.5 py-2.5 shadow-soft', !data && 'skeleton h-14 border-0')}>
-            {data && <><p className="text-xs text-gray-500">{s.label}</p><p className="truncate text-lg font-semibold tabular-nums text-gray-900">{typeof s.value === 'number' && /cost|value/i.test(s.label) ? formatMoney(s.value) : s.value}</p></>}
+            {data && <><p className="truncate text-xs text-gray-500">{s.label}</p><p className="truncate text-lg font-semibold tabular-nums text-gray-900">{typeof s.value === 'number' && /cost|value/i.test(s.label) ? formatMoney(s.value) : s.value}</p></>}
           </div>
         ))}
       </div>
 
-      <TableCard className="min-h-[18rem] flex-1" footer={<TablePager shown={shown.length} total={rows.length} noun="rows" page={page} pages={pages} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
-        <TableScrollArea className="flex-1">
-          {isLoading ? <div className="space-y-2 p-4">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-8" />)}</div> : !rows.length ? (
-            <div className="flex flex-col items-center gap-2 py-14 text-center"><CalendarClock className="h-9 w-9 text-gray-300" /><p className="text-sm font-medium text-gray-700">Nothing to show</p><p className="text-sm text-gray-500">Try a wider period or clear the filters.</p></div>
-          ) : (
-            <table className={cn('w-full text-sm transition-opacity', isFetching && 'opacity-60')}>
-              <thead><tr>{data!.columns.map((c) => (
-                <th key={c.key} className={cn(TH_STICKY, 'whitespace-nowrap px-3 py-2 text-left font-medium text-gray-500')}>
-                  <button className="inline-flex items-center gap-1 hover:text-gray-900" onClick={() => setSort((s) => s?.key === c.key ? { key: c.key, dir: s.dir === 1 ? -1 : 1 } : { key: c.key, dir: 1 })}>
-                    {c.label}{sort?.key === c.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : <ArrowDownUp className="h-3 w-3 opacity-30" />}
-                  </button>
-                </th>
-              ))}</tr></thead>
-              <tbody className="divide-y">{shown.map((r, i) => (
-                <tr key={i} className="transition-colors hover:bg-gray-50">{data!.columns.map((c) => <td key={c.key} className="max-w-[18rem] truncate px-3 py-2 text-gray-700">{cell(c.key, r[c.key], r)}</td>)}</tr>
-              ))}</tbody>
-            </table>
-          )}
-        </TableScrollArea>
-      </TableCard>
-      {data?.truncated && <p className="text-xs text-amber-700">Showing the first 5,000 rows. Narrow the filters for a complete view.</p>}
+      <TableToolbar state={t} searchPlaceholder={`Search ${def.title.toLowerCase()}…`} filterFields={fields} sorts={sorts} columns={columns} />
+
+      <DataTable rows={view.rows} rowKey={(r) => r.__i} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        loading={isLoading && !data} fetching={isFetching} error={error ? errorMessage(error) : null}
+        empty={<EmptyRows icon={<CalendarClock className="h-9 w-9" />} title="Nothing to show" hint={filtered ? 'Clear the search or filters.' : def.dated ? 'Try a wider period.' : undefined} />}
+        pager={{ page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'rows' }} />
+      {data?.truncated && <p className="shrink-0 text-xs text-amber-700">Showing the first 5,000 rows. Narrow the period for a complete view.</p>}
     </>
   )
 }

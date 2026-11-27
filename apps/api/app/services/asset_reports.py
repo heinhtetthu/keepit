@@ -90,7 +90,7 @@ async def repairs(db, f, start, end):
     for r, _ in rows_db:
         if r.vendor:
             vendors[r.vendor] = vendors.get(r.vendor, 0) + _money(r.cost)
-    top = max(vendors, key=vendors.get) if vendors else "—"
+    top = max(vendors, key=vendors.get) if vendors else "-"
     return {
         "columns": [("date", "Date"), ("asset", "Asset"), ("type", "Type"), ("issue", "Issue"), ("vendor", "Vendor"),
                     ("status", "Status"), ("cost", "Cost")],
@@ -189,6 +189,21 @@ async def holders(db, f, start, end):
     }
 
 
+# Column kinds, so the web app can build filters (choice pills, date and number
+# ranges) and the CSV export can apply the same filters on the server.
+COLUMN_TYPES = {
+    "date": "date", "purchased": "date", "warranty_end": "date", "borrowed": "date", "due": "date", "returned": "date",
+    "cost": "money", "value": "money", "count": "number", "days_left": "number",
+    "type": "choice", "holder": "choice", "business_unit": "choice", "status": "choice", "condition": "choice",
+    "location": "choice", "vendor": "choice", "body": "choice", "os": "choice", "state": "choice", "borrower": "choice",
+    "title": "choice",
+}
+
+
+def column_type(key: str) -> str:
+    return COLUMN_TYPES.get(key, "text")
+
+
 BUILDERS = {"inventory": inventory, "repairs": repairs, "maintenance": maintenance, "borrows": borrows,
             "warranties": warranties, "holders": holders}
 
@@ -196,9 +211,88 @@ BUILDERS = {"inventory": inventory, "repairs": repairs, "maintenance": maintenan
 async def build(db: AsyncSession, kind: str, f: AssetFilters, start: date | None, end: date | None) -> dict[str, Any]:
     data = await BUILDERS[kind](db, f, start, end)
     return {"kind": kind, "title": REPORTS[kind]["title"],
-            "columns": [{"key": k, "label": label} for k, label in data["columns"]],
+            "columns": [{"key": k, "label": label, "type": column_type(k)} for k, label in data["columns"]],
             "rows": data["rows"], "summary": [{"label": label, "value": v} for label, v in data["summary"]],
             "truncated": len(data["rows"]) >= MAX_ROWS, **({"window": data["window"]} if "window" in data else {})}
+
+
+def _day_before(iso: str) -> str:
+    return (date.fromisoformat(iso[:10]) - timedelta(days=1)).isoformat()
+
+
+def _range(want: Any) -> tuple[Any, Any]:
+    """Filter-panel range {gte, lte} | {lt} -> inclusive (from, to)."""
+    if not isinstance(want, dict):
+        return None, None
+    to = want.get("lte") or None
+    if to is None and want.get("lt"):
+        to = _day_before(str(want["lt"]))
+    return want.get("gte") or None, to
+
+
+def _choices(want: Any) -> list[str]:
+    if isinstance(want, dict):
+        want = want.get("in") or []
+    if isinstance(want, str):
+        want = [want] if want else []
+    return [str(x) for x in want] if isinstance(want, list) else []
+
+
+def _num(v: Any) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _matches(kind: str, raw: Any, want: Any) -> bool:
+    empty = raw is None or raw == ""
+    if kind == "text":
+        return not empty and str(want).lower() in str(raw).lower()
+    if kind in ("date", "number", "money"):
+        lo, hi = _range(want)
+        if empty:
+            return False
+        if kind == "date":
+            x = str(raw)[:10]
+            return (not lo or x >= str(lo)[:10]) and (not hi or x <= str(hi)[:10])
+        x, lo_n, hi_n = _num(raw), _num(lo), _num(hi)
+        if x is None:
+            return False
+        return (lo_n is None or x >= lo_n) and (hi_n is None or x <= hi_n)
+    wanted = _choices(want)
+    return not wanted or (not empty and str(raw) in wanted)
+
+
+def _sort_key(v: Any):
+    if isinstance(v, (int, float)):
+        return (0, float(v), "")
+    return (1, 0.0, str(v).casefold())
+
+
+def apply_view(report: dict[str, Any], filters: dict[str, Any] | None = None, search: str | None = None,
+               sort: str | None = None, order: str = "asc", columns: list[str] | None = None) -> dict[str, Any]:
+    """Apply the web table's search, panel filters, sort and column choice to a report.
+
+    Mirrors the browser's clientRows so a CSV export holds exactly the rows on screen.
+    """
+    cols = report["columns"]
+    by_key = {c["key"]: c for c in cols}
+    rows = report["rows"]
+    needle = (search or "").strip().lower()
+    if needle:
+        rows = [r for r in rows if needle in " ".join("" if r.get(c["key"]) is None else str(r.get(c["key"])) for c in cols).lower()]
+    active = {k: v for k, v in (filters or {}).items() if k in by_key and v not in (None, "", [], {})}
+    if active:
+        rows = [r for r in rows if all(_matches(by_key[k].get("type") or column_type(k), r.get(k), v) for k, v in active.items())]
+    if sort in by_key:
+        present = [r for r in rows if r.get(sort) not in (None, "")]
+        missing = [r for r in rows if r.get(sort) in (None, "")]
+        rows = sorted(present, key=lambda r: _sort_key(r.get(sort)), reverse=order == "desc") + missing
+    if columns:
+        picked = [by_key[k] for k in columns if k in by_key]
+        cols = picked or cols
+    return {**report, "columns": cols, "rows": rows}
 
 
 def to_csv(report: dict[str, Any]) -> str:

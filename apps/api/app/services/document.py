@@ -1,11 +1,11 @@
 """Documents: upload, metadata, links to assets/employees/records/borrows,
 download, soft delete. Files go through the pluggable storage backend."""
 import hashlib
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from math import ceil
 from typing import Any
 
-from sqlalchemy import cast, func, or_, select, String
+from sqlalchemy import and_, cast, func, or_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -99,26 +99,104 @@ async def upload(db: AsyncSession, *, file_name: str, content_type: str | None, 
     return doc
 
 
+EXPIRY_STATES = ("expired", "expiring", "active", "none")
+EXPIRING_DAYS = 30
+# File kinds for the "Type" filter, matched on the stored MIME type.
+FILE_KINDS = {
+    "pdf": ["application/pdf"],
+    "image": ["image/%"],
+    "text": ["text/%"],
+    "office": ["application/msword", "application/vnd.openxmlformats-officedocument%", "application/vnd.ms-%",
+               "application/vnd.oasis.opendocument%"],
+}
+DOCUMENT_SORTS = {"title": Document.title, "category": Document.category, "expiry_date": Document.expiry_date,
+                  "size_bytes": Document.size_bytes, "created_at": Document.created_at, "file_name": Document.file_name,
+                  "updated_at": Document.updated_at}
+
+
+def _csv(v: str | None) -> list[str]:
+    return [x.strip() for x in (v or "").split(",") if x.strip()]
+
+
+def _kind_clause(kind: str):
+    if kind == "other":
+        known = [p for ps in FILE_KINDS.values() for p in ps]
+        return and_(*[~Document.mime_type.like(p) for p in known])
+    return or_(*[Document.mime_type.like(p) for p in FILE_KINDS.get(kind, [])]) if kind in FILE_KINDS else None
+
+
 async def list_documents(db: AsyncSession, *, q: str | None = None, category: str | None = None,
                          entity_type: str | None = None, entity_id: int | None = None, expiring_before: date | None = None,
-                         deleted: bool = False, page: int = 1, page_size: int = 50) -> dict[str, Any]:
+                         deleted: bool = False, page: int = 1, page_size: int = 50, linked: str | None = None,
+                         expiry: str | None = None, expiry_from: date | None = None, expiry_to: date | None = None,
+                         uploaded_from: date | None = None, uploaded_to: date | None = None, file_type: str | None = None,
+                         sort: str | None = None, order: str = "desc") -> dict[str, Any]:
     stmt = select(Document).where(Document.deleted_at.isnot(None) if deleted else Document.deleted_at.is_(None))
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Document.title.ilike(like), Document.file_name.ilike(like),
                               Document.reference_number.ilike(like), cast(Document.tags, String).ilike(like)))
-    if category:
-        stmt = stmt.where(Document.category == category)
+    if categories := _csv(category):
+        stmt = stmt.where(Document.category.in_(categories))
     if entity_type and entity_id:
         stmt = stmt.where(Document.id.in_(select(DocumentLink.document_id).where(
             DocumentLink.entity_type == entity_type, DocumentLink.entity_id == entity_id)))
+    if kinds := _csv(linked):
+        # "none" = not linked to anything; other values are entity types (asset, employee, record, borrow).
+        clauses = []
+        types = [k for k in kinds if k in ENTITY_MODELS]
+        if types:
+            clauses.append(Document.id.in_(select(DocumentLink.document_id).where(DocumentLink.entity_type.in_(types))))
+        if "none" in kinds:
+            clauses.append(~Document.id.in_(select(DocumentLink.document_id)))
+        stmt = stmt.where(or_(*clauses) if clauses else Document.id == -1)
     if expiring_before:
         stmt = stmt.where(Document.expiry_date.isnot(None), Document.expiry_date <= expiring_before)
+    if states := [s for s in _csv(expiry) if s in EXPIRY_STATES]:
+        d0 = _today()
+        by_state = {
+            "expired": Document.expiry_date < d0,
+            "expiring": Document.expiry_date.between(d0, d0 + timedelta(days=EXPIRING_DAYS)),
+            "active": Document.expiry_date > d0 + timedelta(days=EXPIRING_DAYS),
+            "none": Document.expiry_date.is_(None),
+        }
+        stmt = stmt.where(or_(*[by_state[s] for s in states]))
+    if expiry_from:
+        stmt = stmt.where(Document.expiry_date >= expiry_from)
+    if expiry_to:
+        stmt = stmt.where(Document.expiry_date <= expiry_to)
+    if uploaded_from:
+        stmt = stmt.where(func.date(Document.created_at) >= uploaded_from)
+    if uploaded_to:
+        stmt = stmt.where(func.date(Document.created_at) <= uploaded_to)
+    if kinds := [c for c in (_kind_clause(k) for k in _csv(file_type)) if c is not None]:
+        stmt = stmt.where(or_(*kinds))
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    rows = (await db.execute(stmt.order_by(Document.created_at.desc(), Document.id.desc())
+    col = DOCUMENT_SORTS.get(sort or "created_at", Document.created_at)
+    direction = col.asc().nulls_last() if order == "asc" else col.desc().nulls_last()
+    rows = (await db.execute(stmt.order_by(direction, Document.id.desc())
                              .offset((page - 1) * page_size).limit(page_size))).scalars().all()
     return {"items": [await serialize(db, d, with_labels=False) for d in rows], "page": page, "page_size": page_size,
             "total": total, "total_pages": max(1, ceil(total / page_size))}
+
+
+async def tab_counts(db: AsyncSession) -> dict[str, int]:
+    """Counts for the Documents page tabs."""
+    d0 = _today()
+    live = Document.deleted_at.is_(None)
+    linked = Document.id.in_(select(DocumentLink.document_id))
+    row = (await db.execute(select(
+        func.count(Document.id),
+        func.count(Document.id).filter(Document.expiry_date.between(d0, d0 + timedelta(days=EXPIRING_DAYS))),
+        func.count(Document.id).filter(Document.expiry_date < d0),
+        func.count(Document.id).filter(~linked),
+    ).where(live))).one()
+    return {"total": row[0], "expiring": row[1], "expired": row[2], "unlinked": row[3]}
+
+
+def _today() -> date:
+    from app.services.clock import today
+    return today()
 
 
 async def documents_for_entity(db: AsyncSession, entity_type: str, entity_id: int) -> list[dict[str, Any]]:

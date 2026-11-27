@@ -6,9 +6,9 @@
 |---|---|---|
 | `frontend` | nginx serving the web app and proxying `/api` and `/docs` to the API | `${FRONTEND_PORT:-80}` |
 | `backend` | FastAPI API, runs as `keepit_app` | internal :8000 |
-| `worker` | reminders, auto-renewals, asset digest, report jobs | – |
+| `worker` | reminders, auto-renewals, asset digest, report jobs | - |
 | `postgres` | PostgreSQL 16 | internal |
-| `backups` | encrypted nightly `pg_dump` | – |
+| `backups` | encrypted nightly `pg_dump` | - |
 | `mcp` | MCP server for AI clients (profile `tools`, started on demand) | stdio |
 
 ## First run

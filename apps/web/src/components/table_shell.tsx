@@ -13,7 +13,8 @@ import Combobox from '@/components/ui/combobox'
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 /** localStorage-backed rows-per-page. */
-export function usePageSize(storageKey: string, initial = 25) {
+/** localStorage-backed rows-per-page; every list starts at 10. */
+export function usePageSize(storageKey: string, initial = 10) {
   const [size, setSizeState] = useState<number>(initial)
   useEffect(() => {
     try {
@@ -74,7 +75,7 @@ export function RowsPerPageSelect({ value, onChange }: {
   return (
     <div className="flex shrink-0 items-center gap-2 whitespace-nowrap text-xs text-gray-500">
       <span>Rows per page</span>
-      <div className="w-[4.5rem]" aria-label="Rows per page">
+      <div className="w-[5.25rem]" aria-label="Rows per page">
         <Combobox compact className="h-8 text-xs" value={String(value)} onChange={(v) => v && onChange(Number(v))}
           options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))} />
       </div>

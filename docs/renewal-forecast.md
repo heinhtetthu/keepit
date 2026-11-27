@@ -50,9 +50,9 @@ introduce approvals, escalation, attachments, or automatic payment actions.
 
 ## API and resource controls
 
-- `GET /api/v1/reports/forecast`: `months` (1–24), `start` (today through the next
+- `GET /api/v1/reports/forecast`: `months` (1-24), `start` (today through the next
   24 months), `repeat_cycles`, `record_type_id`, `business_unit`, `currency`,
-  `vendor`, `page`, and `page_size` (1–100).
+  `vendor`, `page`, and `page_size` (1-100).
 - Empty string filters mean unassigned/unspecified; omitted filters mean all.
 - `GET /api/v1/reports/forecast.csv` takes the same filters and exports summaries.
 - Detail rows are paginated, while all totals cover the complete filtered
@@ -60,7 +60,7 @@ introduce approvals, escalation, attachments, or automatic payment actions.
 - Forecast queries are limited to two simultaneous requests per API process by
   default (`FORECAST_MAX_CONCURRENT`). Waiting more than ten seconds returns a
   clear HTTP 503 busy response. SQL execution has a fifteen-second deadline by
-  default (`FORECAST_QUERY_TIMEOUT_SECONDS`, clamped to 1–60 seconds). These
+  default (`FORECAST_QUERY_TIMEOUT_SECONDS`, clamped to 1-60 seconds). These
   limits protect other requests under report-heavy load. Budget the total
   concurrency across all API replicas when changing them.
 

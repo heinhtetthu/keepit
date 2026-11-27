@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { FileText, Search, Upload } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { FileText, Pencil, Trash2, Upload } from 'lucide-react'
 import { DOCUMENT_CATEGORIES, errorMessage, formatBytes, formatDate, daysUntil, useApi, useAssetMutation, useDocuments, type Document } from '@workspace/core'
+import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -9,78 +11,150 @@ import { Badge } from '@/components/ui/badge'
 import RowMenu from '@/components/ui/menu'
 import Modal from '@/components/ui/modal'
 import { toast } from '@/components/ui/toaster'
-import { TableCard, TableScrollArea, TH_STICKY, TablePager, usePageSize } from '@/components/table_shell'
-import { EmptyState, Field, useCan, useConfirm } from '@/components/assets/shared'
+import { Field, useCan, useConfirm } from '@/components/assets/shared'
 import { DownloadButton, PreviewDialog, UploadDialog } from '@/components/documents/DocumentDialogs'
+import {
+  DataTable, EmptyRows, MoreMenu, TableTabs, TableToolbar, TitleCell, csv, filterField, range,
+  useTableState, type Column, type SortDef,
+} from '@/components/data-table'
+import { cn } from '@/lib/utils'
+import type { FilterState } from '@/components/FilterBar'
 
-const th = `${TH_STICKY} px-3 py-2 text-left text-xs font-medium text-gray-500`
 const LINK_PATH: Record<string, (id: number) => string> = { asset: (id) => `/assets/${id}`, employee: (id) => `/employees/${id}`, borrow: () => '/it-logs' }
+const LINK_LABEL: Record<string, string> = { asset: 'Asset', employee: 'Employee', record: 'Record', borrow: 'Borrow' }
+
+type Counts = { total: number; expiring: number; expired: number; unlinked: number }
+const TABS: { id: string; label: string; count: keyof Counts; tone?: string; params: Record<string, string> }[] = [
+  { id: 'all', label: 'All', count: 'total', params: {} },
+  { id: 'expiring', label: 'Expiring soon', count: 'expiring', tone: 'text-amber-700', params: { expiry: 'expiring' } },
+  { id: 'expired', label: 'Expired', count: 'expired', tone: 'text-red-600', params: { expiry: 'expired' } },
+  { id: 'unlinked', label: 'Unlinked', count: 'unlinked', params: { linked: 'none' } },
+]
+const LINKED = [...Object.entries(LINK_LABEL).map(([value, label]) => ({ value, label })), { value: 'none', label: 'Not linked' }]
+const EXPIRY = [{ value: 'expiring', label: 'Expiring in 30 days' }, { value: 'expired', label: 'Expired' }, { value: 'active', label: 'Valid' }, { value: 'none', label: 'No expiry' }]
+const KINDS = [{ value: 'pdf', label: 'PDF' }, { value: 'image', label: 'Image' }, { value: 'text', label: 'Text / CSV' }, { value: 'office', label: 'Office' }, { value: 'other', label: 'Other' }]
+
+function kindOf(mime: string) {
+  if (mime === 'application/pdf') return 'PDF'
+  if (mime.startsWith('image/')) return 'Image'
+  if (mime.startsWith('text/')) return 'Text'
+  if (/msword|officedocument|ms-|opendocument/.test(mime)) return 'Office'
+  return 'Other'
+}
+
+/** Panel filters → document API parameters. */
+function toParams(f: FilterState): Record<string, string | undefined> {
+  const exp = range(f.expiry_date), up = range(f.created_at)
+  return {
+    category: csv(f.category), linked: csv(f.linked), expiry: csv(f.expiry), file_type: csv(f.file_type),
+    expiry_from: exp.from, expiry_to: exp.to, uploaded_from: up.from, uploaded_to: up.to,
+  }
+}
+
+const dash = <span className="text-gray-400">-</span>
+const SORTS: SortDef[] = [
+  { id: 'created_at', label: 'Uploaded', kind: 'date' }, { id: 'title', label: 'Title' }, { id: 'category', label: 'Category' },
+  { id: 'expiry_date', label: 'Expiry date', kind: 'date' }, { id: 'size_bytes', label: 'Size', kind: 'number' },
+  { id: 'file_name', label: 'File name' }, { id: 'updated_at', label: 'Last updated', kind: 'date' },
+]
 
 export default function Documents() {
   const can = useCan()
-  const api = useApi()
+  const core = useApi()
   const [sp, setSp] = useSearchParams()
-  const [q, setQ] = useState('')
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = usePageSize('documents-page-size', 25)
-  const { data, isLoading } = useDocuments({ q: search || undefined, category: category || undefined, page, page_size: pageSize })
+  const t = useTableState({ key: 'documents', defaultSort: 'created_at', defaultOrder: 'desc', defaultColumns: ['category', 'linked', 'expiry', 'size', 'created_at'] })
+  const trash = !!t.extras.trash
+  const tab = TABS.find((x) => x.id === t.tab) ?? TABS[0]
+  const { data, isLoading, isFetching, error } = useDocuments({
+    ...toParams(t.filters), ...(trash ? {} : tab.params), q: t.search || undefined, deleted: trash || undefined,
+    page: t.page, page_size: t.pageSize, sort: t.sort, order: t.order,
+  })
+  const { data: counts } = useQuery<Counts>({ queryKey: ['documents', 'tab-counts'], queryFn: async () => (await api.get('/documents/tab-counts')).data })
   const [upload, setUpload] = useState(false)
   const [preview, setPreview] = useState<Document | null>(null)
   const [edit, setEdit] = useState<Document | null>(null)
   const del = useAssetMutation((a, id: number) => a.documents.remove(id))
+  const restore = useAssetMutation((a, id: number) => a.documents.restore(id))
   const { confirm, dialog } = useConfirm()
   const items = data?.items ?? []
+  const filtered = !!t.search || Object.keys(t.filters).length > 0 || tab.id !== 'all'
 
   useEffect(() => {  // deep link from ⌘K: /documents?open=ID
     const open = Number(sp.get('open'))
-    if (open) api.documents.get(open).then(setPreview).catch(() => undefined).finally(() => setSp({}, { replace: true }))
-  }, [api, sp, setSp])
+    if (open) core.documents.get(open).then(setPreview).catch(() => undefined).finally(() => setSp({}, { replace: true }))
+  }, [core, sp, setSp])
+
+  const fields = useMemo(() => [
+    filterField('category', 'Category', 'select', [...DOCUMENT_CATEGORIES]),
+    filterField('linked', 'Linked to', 'select', LINKED),
+    filterField('expiry', 'Expiry status', 'select', EXPIRY),
+    filterField('expiry_date', 'Expiry date', 'date'),
+    filterField('created_at', 'Uploaded', 'date'),
+    filterField('file_type', 'File type', 'select', KINDS),
+  ], [])
+
+  const columns = useMemo((): Column<Document>[] => [
+    { id: 'title', label: 'Title', sort: 'title', locked: true, render: (d) => (
+      <TitleCell title={d.title} sub={[d.file_name, d.reference_number && `#${d.reference_number}`].filter(Boolean).join(' · ')} />) },
+    { id: 'category', label: 'Category', sort: 'category', render: (d) => <Badge variant="outline">{d.category}</Badge> },
+    { id: 'linked', label: 'Linked to', render: (d) => d.links.length
+      ? <span className="text-gray-700">{[...new Set(d.links.map((l) => LINK_LABEL[l.entity_type] ?? l.entity_type))].join(', ')}{d.links.length > 1 && <span className="text-gray-400"> ({d.links.length})</span>}</span>
+      : <span className="text-gray-400">Not linked</span> },
+    { id: 'expiry', label: 'Expires', sort: 'expiry_date', render: (d) => {
+      if (!d.expiry_date) return dash
+      const left = daysUntil(d.expiry_date)
+      return <span className={cn('tabular-nums', left !== null && left < 0 ? 'text-red-600' : left !== null && left <= 30 ? 'font-medium text-amber-700' : 'text-gray-700')}>{formatDate(d.expiry_date)}</span>
+    } },
+    { id: 'size', label: 'Size', sort: 'size_bytes', align: 'right', render: (d) => formatBytes(d.size_bytes) },
+    { id: 'file_type', label: 'Type', render: (d) => kindOf(d.mime_type) },
+    { id: 'reference', label: 'Reference no.', render: (d) => d.reference_number || dash },
+    { id: 'tags', label: 'Tags', render: (d) => d.tags.length ? d.tags.join(', ') : dash },
+    { id: 'uploaded_by', label: 'Uploaded by', render: (d) => d.uploaded_by_name || dash },
+    { id: 'created_at', label: 'Uploaded', sort: 'created_at', render: (d) => <span className="tabular-nums">{formatDate(d.created_at)}</span> },
+  ], [])
+
+  const rowMenu = (d: Document) => trash ? (
+    <RowMenu items={[{ label: 'Restore', hidden: !can('document.delete'), onSelect: () => restore.mutate(d.id, { onSuccess: () => toast.success('Document restored'), onError: (e) => toast.error(errorMessage(e)) }) }]} />
+  ) : (
+    <div className="flex justify-end gap-1">
+      <DownloadButton doc={d} variant="ghost" />
+      <RowMenu items={[
+        { label: 'Preview', onSelect: () => setPreview(d) },
+        { label: 'Edit details & links', icon: <Pencil />, onSelect: () => setEdit(d), hidden: !can('document.edit') },
+        { label: 'Move to trash', icon: <Trash2 />, danger: true, divider: true, hidden: !can('document.delete'), onSelect: () => confirm('Delete document', `Move “${d.title}” to trash?`, () => del.mutateAsync(d.id).then(() => toast.success('Moved to trash')), 'Delete') },
+      ]} />
+    </div>
+  )
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div><h1 className="text-2xl font-semibold tracking-tight text-gray-900">Documents</h1><p className="text-sm text-gray-500">Invoices, warranties, contracts and licenses linked to assets, people and renewals.</p></div>
-        {can('document.upload') && <Button className="ml-auto" size="sm" onClick={() => setUpload(true)}><Upload className="mr-1.5 h-4 w-4" />Upload</Button>}
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-white"><FileText className="h-5 w-5 text-gray-600" /></div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">{trash ? 'Documents in trash' : 'Documents'}</h1>
+            <p className="truncate text-sm text-gray-500">{trash ? 'Restore anything deleted by mistake.' : 'Invoices, warranties, contracts and licenses linked to assets, people and renewals.'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {trash && <Button variant="outline" size="sm" onClick={() => t.setExtra('trash', false)}>Back to documents</Button>}
+          {can('document.upload') && !trash && <Button size="sm" onClick={() => setUpload(true)}><Upload className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Upload</span></Button>}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <form className="relative w-full sm:w-72" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); setPage(1) }}>
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input className="pl-8" placeholder="Title, file, reference, tag…" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => { setSearch(q.trim()); setPage(1) }} />
-        </form>
-        <Select className="w-auto" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} aria-label="Category">
-          <option value="">All categories</option>{DOCUMENT_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-        </Select>
-      </div>
-      <TableCard footer={<TablePager shown={items.length} total={data?.total ?? 0} noun="documents" page={page} pages={data?.total_pages ?? 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}>
-        <TableScrollArea>
-          {isLoading ? <p className="p-6 text-center text-sm text-gray-400">Loading…</p> : !items.length ? <EmptyState icon={<FileText className="h-10 w-10" />} title="No documents" /> : (
-            <table className="w-full text-sm"><thead><tr><th className={th}>Title</th><th className={th}>Category</th><th className={th}>Expires</th><th className={th}>Size</th><th className={th}>Uploaded</th><th className={th} /></tr></thead>
-              <tbody className="divide-y">{items.map((d) => {
-                const left = daysUntil(d.expiry_date)
-                return (
-                  <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2"><button className="text-left font-medium text-gray-900 hover:underline" onClick={() => setPreview(d)}>{d.title}</button>
-                      <div className="text-xs text-gray-500">{d.file_name}{d.reference_number && ` · #${d.reference_number}`}{d.tags.length > 0 && ` · ${d.tags.join(', ')}`}</div></td>
-                    <td className="px-3 py-2"><Badge variant="outline">{d.category}</Badge></td>
-                    <td className={`px-3 py-2 ${left !== null && left >= 0 && left <= 30 ? 'font-medium text-amber-700' : 'text-gray-600'}`}>{formatDate(d.expiry_date)}</td>
-                    <td className="px-3 py-2 text-gray-600">{formatBytes(d.size_bytes)}</td>
-                    <td className="px-3 py-2 text-gray-600">{formatDate(d.created_at)}</td>
-                    <td className="px-3 py-2 text-right"><div className="flex justify-end gap-1">
-                      <DownloadButton doc={d} variant="ghost" />
-                      <RowMenu items={[
-                        { label: 'Preview', onSelect: () => setPreview(d) },
-                        { label: 'Edit details & links', onSelect: () => setEdit(d), hidden: !can('document.edit') },
-                        { label: 'Delete', danger: true, divider: true, hidden: !can('document.delete'), onSelect: () => confirm('Delete document', `Delete “${d.title}”?`, () => del.mutateAsync(d.id), 'Delete') },
-                      ]} />
-                    </div></td>
-                  </tr>
-                )
-              })}</tbody></table>
-          )}
-        </TableScrollArea>
-      </TableCard>
+
+      {!trash && <TableTabs tabs={TABS.map((x) => ({ id: x.id, label: x.label, count: counts?.[x.count], tone: x.tone }))} value={t.tab}
+        onChange={(id) => { t.setTab(id); if (id === 'expiring' || id === 'expired') t.setSort('expiry_date', id === 'expiring' ? 'asc' : 'desc') }} />}
+
+      <TableToolbar state={t} searchPlaceholder="Title, file, reference, tag…" filterFields={fields} sorts={SORTS} columns={columns}
+        more={can('document.delete') ? <MoreMenu toggles={[{ id: 'trash', label: 'Show trash', value: trash, onChange: (v) => t.setExtra('trash', v) }]} /> : undefined} />
+
+      <DataTable rows={items} rowKey={(d) => d.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        loading={isLoading && !data} fetching={isFetching} error={error ? errorMessage(error) : null}
+        onRowClick={trash ? undefined : (d) => setPreview(d)} actions={rowMenu}
+        empty={<EmptyRows icon={<FileText className="h-9 w-9" />} title={trash ? 'Trash is empty' : 'No documents match'}
+          hint={!trash && !filtered && can('document.upload') ? 'Upload an invoice, warranty or contract.' : !trash ? 'Try another tab or clear the filters.' : undefined} />}
+        pager={{ page: t.page, pages: data?.total_pages ?? 1, total: data?.total ?? 0, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'documents' }} />
+
       {upload && <UploadDialog onClose={() => setUpload(false)} />}
       {preview && <PreviewDialog doc={preview} onClose={() => setPreview(null)} />}
       {edit && <EditDialog doc={edit} onClose={() => setEdit(null)} />}

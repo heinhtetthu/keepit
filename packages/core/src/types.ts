@@ -19,7 +19,7 @@ export type Employee = Schemas['EmployeeResponse']
 export type OffboardRequest = Schemas['OffboardRequest']
 
 export interface Page<T> { items: T[]; page: number; page_size: number; total: number; total_pages: number }
-export type LogEntry<T> = T & { asset_name: string }
+export type LogEntry<T> = T & { asset_name: string; asset_type?: string | null; serial_number?: string | null }
 
 export interface ReferenceItem { id: number; kind: string; name: string; sort_order: number; meta: Record<string, unknown> }
 export type ReferenceLists = Record<'brand' | 'asset_type' | 'location' | 'region' | 'vendor', ReferenceItem[]>
@@ -52,15 +52,36 @@ export interface AssetSummary {
 
 export interface SearchHit { kind: 'type' | 'record' | 'asset' | 'employee' | 'document'; title: string; subtitle?: string; url: string; id?: number; icon?: string | null }
 
-export interface CurrencySettings { default_currency: string; rates: Record<string, number> }
+export interface CurrencySettings { default_currency: string; rates: Record<string, number>; rates_updated_at?: Record<string, string> }
 
 export type AssetReportKind = 'inventory' | 'repairs' | 'maintenance' | 'borrows' | 'warranties' | 'holders'
 export interface AssetReport {
   kind: AssetReportKind
   title: string
-  columns: { key: string; label: string }[]
+  columns: { key: string; label: string; type?: 'text' | 'choice' | 'date' | 'money' | 'number' }[]
   rows: Record<string, string | number | null>[]
   summary: { label: string; value: string | number }[]
   truncated: boolean
   window?: { from: string; to: string }
 }
+
+export type HistoryEntity = 'asset' | 'record' | 'employee'
+export interface HistoryChange { field: string; label: string; before: unknown; after: unknown }
+export interface HistoryEntry {
+  id: string
+  audit_id: number | null
+  kind: string
+  action: string
+  summary: string
+  actor_id: number | null
+  actor_name: string | null
+  timestamp: string
+  changes: HistoryChange[]
+  details: string | null
+  restorable: boolean
+  /** true when the sentence is about the entity itself (e.g. "holds Dell XPS"), not about the actor. */
+  subject: boolean
+  link: { type: string; id: number; slug?: string | null } | null
+}
+export interface HistoryPage extends Page<HistoryEntry> { kinds: { key: string; label: string; count: number }[]; can_restore: boolean }
+export interface HistoryRestorePreview { audit_id: number; changes: HistoryChange[]; restored_entry_id?: number | null }

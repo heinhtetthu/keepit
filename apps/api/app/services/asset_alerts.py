@@ -37,10 +37,10 @@ async def build_digest(db: AsyncSession, days: int) -> str | None:
     parts = [f"<b>Asset digest · {d0.isoformat()}</b>"]
     if warranties:
         parts.append(f"\n<b>Warranties ending within {days} days</b>")
-        parts += [f"• {escape(a.display_name)} — {a.warranty_end_date.isoformat()}" for a in warranties]
+        parts += [f"• {escape(a.display_name)} - {a.warranty_end_date.isoformat()}" for a in warranties]
     if docs:
         parts.append(f"\n<b>Documents expiring within {days} days</b>")
-        parts += [f"• {escape(d.title)} ({escape(d.category)}) — {d.expiry_date.isoformat()}" for d in docs]
+        parts += [f"• {escape(d.title)} ({escape(d.category)}) - {d.expiry_date.isoformat()}" for d in docs]
     if overdue:
         parts.append("\n<b>Overdue borrows</b>")
         parts += [f"• {escape(b.item_name)} → {escape(b.borrower_name)} (due {b.expected_return_date.isoformat()})" for b in overdue]

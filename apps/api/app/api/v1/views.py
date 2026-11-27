@@ -1,6 +1,4 @@
-from typing import Literal
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,16 +18,30 @@ def _need(user: User, permission: str) -> None:
         raise ForbiddenException(f"Missing permission: {permission}")
 
 
+# Lists whose views need a permission. Other list keys hold personal UI settings only.
+SCOPE_PERMISSION = {"assets": "asset.view", "borrows": "itlog.view", "repairs": "itlog.view", "maintenance": "itlog.view",
+                    "documents": "document.view", "employees": "employee.view", "audit": "audit.view"}
+
+
+def _check_scope(user: User, scope: str) -> None:
+    perm = SCOPE_PERMISSION.get(scope)
+    if perm == "audit.view":
+        if not user.is_superuser:
+            raise ForbiddenException("System admin access required")
+    elif perm:
+        _need(user, perm)
+
+
 @router.get("", response_model=list[SavedViewResponse])
 async def list_views(
     record_type_id: int | None = None,
-    scope: Literal["records", "assets"] = "records",
+    scope: str = Query("records", pattern=r"^[a-z][a-z0-9_-]{1,19}$"),
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ):
     query = select(SavedView).where(SavedView.user_id == user.id, SavedView.scope == scope)
-    if scope == "assets":
-        _need(user, "asset.view")
+    if scope != "records":
+        _check_scope(user, scope)
         return (await db.execute(query.order_by(SavedView.created_at))).scalars().all()
     allowed = await access_service.allowed_type_ids(db, user)
     if record_type_id is not None:
@@ -49,10 +61,10 @@ async def create_view(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User = Depends(get_current_user),
 ):
-    if data.scope == "assets":
-        _need(user, "asset.view")
+    if data.scope != "records":
+        _check_scope(user, data.scope)
         if data.record_type_id is not None:
-            raise ValidationException("Asset views cannot have a record type")
+            raise ValidationException("Only record views can have a record type")
     else:
         _need(user, "record.view")
         if data.record_type_id is None:

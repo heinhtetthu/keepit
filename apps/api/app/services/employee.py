@@ -9,7 +9,28 @@ from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeImportR
 from app.services.audit import log_audit
 
 
-EXTRA_FIELDS = {"username", "phone", "regions", "gender", "avatar_url", "join_date", "resignation_date"}
+EXTRA_FIELDS = {"username", "phone", "regions", "gender", "avatar_url", "join_date", "resignation_date", "department", "country"}
+
+
+def _clean(v: str | None) -> str | None:
+    v = (v or "").strip()
+    return v or None
+
+
+async def _department_name(db: AsyncSession, name: str | None) -> str | None:
+    """Canonical department name for a snapshot: reuse the master entry
+    (case-insensitive), adding it to the master list when it is new."""
+    from sqlalchemy import func
+    from app.models.department import Department
+    name = _clean(name)
+    if not name:
+        return None
+    dept = (await db.execute(select(Department).where(func.lower(Department.name) == name.lower()))).scalar_one_or_none()
+    if dept is None:
+        dept = Department(name=name)
+        db.add(dept)
+        await db.flush()
+    return dept.name
 
 
 def _serialize(e: Employee) -> dict[str, Any]:
@@ -19,6 +40,8 @@ def _serialize(e: Employee) -> dict[str, Any]:
         "email": e.email,
         "business_units": e.business_units,
         "title": e.title,
+        "department": e.department,
+        "country": e.country,
         "active": e.active,
         "username": e.username,
         "phone": e.phone,
@@ -60,6 +83,10 @@ async def _upsert(db: AsyncSession, data: EmployeeCreate) -> tuple[Employee, boo
             existing.phone = data.phone
         if data.join_date:
             existing.join_date = data.join_date
+        if _clean(data.department):
+            existing.department = await _department_name(db, data.department)
+        if _clean(data.country):
+            existing.country = _clean(data.country)
         return existing, True
     employee = Employee(
         name=data.name.strip(),
@@ -69,6 +96,8 @@ async def _upsert(db: AsyncSession, data: EmployeeCreate) -> tuple[Employee, boo
         active=data.active,
         phone=data.phone,
         join_date=data.join_date,
+        department=await _department_name(db, data.department),
+        country=_clean(data.country),
     )
     db.add(employee)
     return employee, False
@@ -101,6 +130,8 @@ async def bulk_update_employees(db: AsyncSession, data: EmployeeBulkUpdate, user
         updates["business_units"] = clean_bus(data.business_units)
     if data.active is not None:
         updates["active"] = data.active
+    if "department" in data.model_fields_set:
+        updates["department"] = await _department_name(db, data.department)
     for emp in rows:
         for k, v in updates.items():
             setattr(emp, k, v)
@@ -126,7 +157,9 @@ async def bulk_delete_employees(db: AsyncSession, data: EmployeeBulkDelete, user
 COLUMN_CANDIDATES: dict[str, tuple[str, ...]] = {
     "name": ("name", "full name", "employee", "employee name", "full_name", "emp_name"),
     "email": ("email", "e-mail", "email address", "mail"),
-    "business_units": ("business unit", "business_units", "business_unit", "bu", "unit", "department", "dept"),
+    "business_units": ("business unit", "business_units", "business_unit", "bu", "unit"),
+    "department": ("department", "dept", "department name", "division"),
+    "country": ("country", "country name", "nation"),
     "title": ("title", "position", "job title", "role"),
     "phone": ("phone", "phone number", "mobile", "tel", "telephone"),
     "join_date": ("join date", "joined", "joined date", "start date", "hire date"),
@@ -234,6 +267,8 @@ async def import_employee_file(
             title=_cell(row, mapping["title"]) if mapping.get("title") is not None else None,
             phone=_cell(row, mapping.get("phone")),
             join_date=_parse_date(_cell(row, mapping.get("join_date"))),
+            department=_cell(row, mapping.get("department")),
+            country=_cell(row, mapping.get("country")),
             active=True,
         )
 
@@ -246,6 +281,8 @@ async def import_employee_file(
                 "business_units": it.business_units if it else [],
                 "email": it.email if it else None,
                 "title": it.title if it else None,
+                "department": it.department if it else None,
+                "country": it.country if it else None,
             })
         return {
             "columns": headers,
@@ -298,12 +335,15 @@ async def create_employee(db: AsyncSession, data: EmployeeCreate, user_id: int) 
         business_units=data.resolved_business_units(),
         title=data.title,
         active=data.active,
-        **data.model_dump(include=EXTRA_FIELDS),
+        **{**data.model_dump(include=EXTRA_FIELDS),
+           "department": await _department_name(db, data.department),
+           "country": _clean(data.country)},
     )
     db.add(employee)
     await db.flush()
     await db.refresh(employee)
-    await log_audit(db, "employee.create", "settings", employee.id, employee.name,
+    from app.services.history import employee_snapshot
+    await log_audit(db, "employee.create", "settings", employee.id, employee.name, new_values=employee_snapshot(employee),
                     user_id=user_id, details=f"Added employee {employee.name}")
     return _serialize(employee)
 
@@ -312,6 +352,8 @@ async def update_employee(db: AsyncSession, employee_id: int, data: EmployeeUpda
     employee = (await db.execute(select(Employee).where(Employee.id == employee_id))).scalar_one_or_none()
     if not employee:
         raise NotFoundException("Employee not found")
+    from app.services.history import employee_snapshot
+    before = employee_snapshot(employee)
     updates = data.model_dump(exclude_unset=True)
     if "name" in updates and updates["name"]:
         dupe = (await db.execute(
@@ -324,6 +366,10 @@ async def update_employee(db: AsyncSession, employee_id: int, data: EmployeeUpda
     if resolved_bus is not None:
         updates["business_units"] = resolved_bus
     updates.pop("business_unit", None)
+    if "department" in updates:
+        updates["department"] = await _department_name(db, updates["department"])
+    if "country" in updates:
+        updates["country"] = _clean(updates["country"])
     for k, v in updates.items():
         setattr(employee, k, v)
     await db.flush()
@@ -332,6 +378,7 @@ async def update_employee(db: AsyncSession, employee_id: int, data: EmployeeUpda
         await detach_employee_name(db, employee)
     await db.refresh(employee)
     await log_audit(db, "employee.update", "settings", employee.id, employee.name,
+                    old_values=before, new_values=employee_snapshot(employee),
                     user_id=user_id, details=f"Updated employee {employee.name}")
     return _serialize(employee)
 

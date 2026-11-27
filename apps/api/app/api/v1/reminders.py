@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, update
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -136,12 +136,23 @@ async def delete_rule(rule_id: int, db: AsyncSession = Depends(get_db, scope="fu
 
 
 @router.get("/logs", response_model=PaginatedResponse[ReminderLogResponse])
-async def list_logs(page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100), status: str | None = None, db: AsyncSession = Depends(get_db, scope="function"), user=Depends(require_permission("notification.view"))):
+async def list_logs(page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
+                    status: str | None = Query(None, description="Comma list: sent, failed, pending, processing, retry"),
+                    q: str | None = Query(None, max_length=200),
+                    record_type_ids: str | None = Query(None, description="Comma list of record type ids"),
+                    recipient_ids: str | None = Query(None, description="Comma list of recipient ids"),
+                    date_from: date | None = None, date_to: date | None = None,
+                    sort: str | None = Query(None, pattern="^(scheduled_date|sent_at|status|record|recipient|retry_count)$"),
+                    order: str = Query("desc", pattern="^(asc|desc)$"),
+                    db: AsyncSession = Depends(get_db, scope="function"), user=Depends(require_permission("notification.view"))):
     allowed = await access_service.allowed_type_ids(db, user)
+    ids = lambda v: [int(x) for x in (v or "").split(",") if x.strip().isdigit()]  # noqa: E731
     if allowed is not None and not allowed:
         items, total = [], 0
     else:
-        items, total = await reminder_service.get_reminder_logs(db, page, page_size, status, allowed)
+        items, total = await reminder_service.get_reminder_logs(
+            db, page, page_size, status, allowed, q=q, record_type_ids=ids(record_type_ids), recipient_ids=ids(recipient_ids),
+            date_from=date_from, date_to=date_to, sort=sort, order=order)
     return PaginatedResponse(items=items, page=page, page_size=page_size, total=total, total_pages=(total + page_size - 1) // page_size)
 
 
@@ -189,3 +200,12 @@ async def update_bot(bot_id: int, data: TelegramBotUpdate, db: AsyncSession = De
 @router.delete("/bots/{bot_id}", status_code=204)
 async def delete_bot(bot_id: int, db: AsyncSession = Depends(get_db, scope="function"), _=Depends(require_permission("reminder.delete"))):
     await reminder_service.delete_bot(db, bot_id)
+
+
+@router.get("/upcoming")
+async def upcoming_renewals(days: int = Query(90, ge=1, le=365), db: AsyncSession = Depends(get_db, scope="function"), user=Depends(require_permission("reminder.view"))):
+    """Overdue and upcoming renewals with each record's next reminder, for the Reminders page."""
+    if not user.is_superuser and "record.view" not in user.permissions:
+        raise ForbiddenException("Record view permission is required to list upcoming renewals")
+    allowed = await access_service.allowed_type_ids(db, user)
+    return await reminder_service.upcoming_renewals(db, allowed, days)

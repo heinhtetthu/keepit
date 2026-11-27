@@ -1,6 +1,50 @@
 {
  "components": {
   "schemas": {
+   "AIProbe": {
+    "properties": {
+     "api_key": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "A just-pasted key; omit to use the saved key",
+      "title": "Api Key"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "provider": {
+      "anyOf": [
+       {
+        "maxLength": 30,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Defaults to the saved provider",
+      "title": "Provider"
+     }
+    },
+    "title": "AIProbe",
+    "type": "object"
+   },
    "AISettings": {
     "properties": {
      "api_key": {
@@ -18,6 +62,7 @@
      },
      "base_url": {
       "default": "",
+      "description": "Only used by the custom provider",
       "maxLength": 300,
       "title": "Base Url",
       "type": "string"
@@ -27,6 +72,19 @@
       "maxLength": 200,
       "title": "Model",
       "type": "string"
+     },
+     "provider": {
+      "anyOf": [
+       {
+        "maxLength": 30,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Provider id from /settings/ai/providers; omit to infer from base_url",
+      "title": "Provider"
      }
     },
     "title": "AISettings",
@@ -1621,11 +1679,86 @@
     "title": "AssignmentUpdate",
     "type": "object"
    },
+   "AuditChange": {
+    "properties": {
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "new": {
+      "title": "New"
+     },
+     "old": {
+      "title": "Old"
+     }
+    },
+    "required": [
+     "field"
+    ],
+    "title": "AuditChange",
+    "type": "object"
+   },
+   "AuditFilterOptions": {
+    "properties": {
+     "actions": {
+      "items": {
+       "$ref": "#/components/schemas/AuditOption"
+      },
+      "title": "Actions",
+      "type": "array"
+     },
+     "categories": {
+      "items": {
+       "$ref": "#/components/schemas/AuditOption"
+      },
+      "title": "Categories",
+      "type": "array"
+     },
+     "entity_types": {
+      "items": {
+       "$ref": "#/components/schemas/AuditOption"
+      },
+      "title": "Entity Types",
+      "type": "array"
+     },
+     "users": {
+      "items": {
+       "$ref": "#/components/schemas/AuditOption"
+      },
+      "title": "Users",
+      "type": "array"
+     }
+    },
+    "required": [
+     "actions",
+     "entity_types",
+     "users",
+     "categories"
+    ],
+    "title": "AuditFilterOptions",
+    "type": "object"
+   },
    "AuditLogResponse": {
     "properties": {
      "action": {
       "title": "Action",
       "type": "string"
+     },
+     "action_label": {
+      "title": "Action Label",
+      "type": "string"
+     },
+     "category": {
+      "title": "Category",
+      "type": "string"
+     },
+     "changes": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/AuditChange"
+      },
+      "title": "Changes",
+      "type": "array"
      },
      "details": {
       "anyOf": [
@@ -1648,6 +1781,10 @@
        }
       ],
       "title": "Entity Id"
+     },
+     "entity_label": {
+      "title": "Entity Label",
+      "type": "string"
      },
      "entity_name": {
       "anyOf": [
@@ -1701,6 +1838,10 @@
       ],
       "title": "Old Values"
      },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     },
      "timestamp": {
       "format": "date-time",
       "title": "Timestamp",
@@ -1734,7 +1875,11 @@
      "user_id",
      "user_name",
      "action",
+     "action_label",
+     "category",
+     "summary",
      "entity_type",
+     "entity_label",
      "entity_id",
      "entity_name",
      "old_values",
@@ -1744,6 +1889,35 @@
      "timestamp"
     ],
     "title": "AuditLogResponse",
+    "type": "object"
+   },
+   "AuditOption": {
+    "properties": {
+     "category": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value",
+      "type": "string"
+     }
+    },
+    "required": [
+     "value",
+     "label"
+    ],
+    "title": "AuditOption",
     "type": "object"
    },
    "AutoRenewalLogEntry": {
@@ -2128,6 +2302,17 @@
       ],
       "title": "Asset Id"
      },
+     "asset_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset Type"
+     },
      "borrowed_date": {
       "format": "date",
       "title": "Borrowed Date",
@@ -2242,6 +2427,17 @@
    },
    "BorrowUpdate": {
     "properties": {
+     "asset_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset Id"
+     },
      "borrowed_date": {
       "anyOf": [
        {
@@ -2660,6 +2856,21 @@
       "description": "Units of default currency per 1 unit of code",
       "title": "Rates",
       "type": "object"
+     },
+     "rates_updated_at": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Ignored on write; the server records when each rate changed",
+      "title": "Rates Updated At"
      }
     },
     "required": [
@@ -2746,6 +2957,75 @@
      "roles"
     ],
     "title": "CurrentUser",
+    "type": "object"
+   },
+   "DepartmentCreate": {
+    "properties": {
+     "name": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "DepartmentCreate",
+    "type": "object"
+   },
+   "DepartmentResponse": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "employee_count": {
+      "default": 0,
+      "title": "Employee Count",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "DepartmentResponse",
+    "type": "object"
+   },
+   "DepartmentUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "title": "DepartmentUpdate",
     "type": "object"
    },
    "DocumentLinkIn": {
@@ -3124,6 +3404,18 @@
       ],
       "title": "Business Units"
      },
+     "department": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department"
+     },
      "ids": {
       "items": {
        "type": "integer"
@@ -3177,6 +3469,30 @@
       },
       "title": "Business Units",
       "type": "array"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "department": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department"
      },
      "email": {
       "anyOf": [
@@ -3388,10 +3704,32 @@
       "title": "Business Units",
       "type": "array"
      },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
       "type": "string"
+     },
+     "department": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department"
      },
      "email": {
       "anyOf": [
@@ -3556,6 +3894,30 @@
        }
       ],
       "title": "Business Units"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "department": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department"
      },
      "email": {
       "anyOf": [
@@ -3780,6 +4142,237 @@
      }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "HistoryChange": {
+    "properties": {
+     "after": {
+      "title": "After"
+     },
+     "before": {
+      "title": "Before"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "field",
+     "label"
+    ],
+    "title": "HistoryChange",
+    "type": "object"
+   },
+   "HistoryEntry": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Id"
+     },
+     "actor_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Name"
+     },
+     "audit_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audit Id"
+     },
+     "changes": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/HistoryChange"
+      },
+      "title": "Changes",
+      "type": "array"
+     },
+     "details": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Details"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "link": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/HistoryLink"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "restorable": {
+      "default": false,
+      "title": "Restorable",
+      "type": "boolean"
+     },
+     "subject": {
+      "default": false,
+      "title": "Subject",
+      "type": "boolean"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     },
+     "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "action",
+     "summary",
+     "timestamp"
+    ],
+    "title": "HistoryEntry",
+    "type": "object"
+   },
+   "HistoryKind": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "label",
+     "count"
+    ],
+    "title": "HistoryKind",
+    "type": "object"
+   },
+   "HistoryLink": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "integer"
+     },
+     "slug": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Slug"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "type",
+     "id"
+    ],
+    "title": "HistoryLink",
+    "type": "object"
+   },
+   "HistoryPage": {
+    "properties": {
+     "can_restore": {
+      "title": "Can Restore",
+      "type": "boolean"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryEntry"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "kinds": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryKind"
+      },
+      "title": "Kinds",
+      "type": "array"
+     },
+     "page": {
+      "title": "Page",
+      "type": "integer"
+     },
+     "page_size": {
+      "title": "Page Size",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     },
+     "total_pages": {
+      "title": "Total Pages",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total",
+     "page",
+     "page_size",
+     "total_pages",
+     "kinds",
+     "can_restore"
+    ],
+    "title": "HistoryPage",
     "type": "object"
    },
    "Holding": {
@@ -4095,6 +4688,17 @@
       ],
       "title": "Asset Status"
      },
+     "asset_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset Type"
+     },
      "body_condition": {
       "default": "Good",
       "enum": [
@@ -4152,6 +4756,17 @@
        }
       ],
       "title": "Operating System"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
      }
     },
     "required": [
@@ -6849,6 +7464,17 @@
       ],
       "title": "Asset Name"
      },
+     "asset_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset Type"
+     },
      "cost": {
       "anyOf": [
        {
@@ -6903,6 +7529,17 @@
       "format": "date",
       "title": "Repair Date",
       "type": "string"
+     },
+     "serial_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Serial Number"
      },
      "status": {
       "default": "In Progress",
@@ -7093,8 +7730,85 @@
     "title": "ResetRequest",
     "type": "object"
    },
+   "RestorePreview": {
+    "properties": {
+     "audit_id": {
+      "title": "Audit Id",
+      "type": "integer"
+     },
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryChange"
+      },
+      "title": "Changes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "audit_id",
+     "changes"
+    ],
+    "title": "RestorePreview",
+    "type": "object"
+   },
+   "RestoreResult": {
+    "properties": {
+     "audit_id": {
+      "title": "Audit Id",
+      "type": "integer"
+     },
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryChange"
+      },
+      "title": "Changes",
+      "type": "array"
+     },
+     "restored_entry_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Restored Entry Id"
+     }
+    },
+    "required": [
+     "audit_id",
+     "changes"
+    ],
+    "title": "RestoreResult",
+    "type": "object"
+   },
    "ReturnRequest": {
     "properties": {
+     "condition": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Condition"
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "maxLength": 2000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notes"
+     },
      "returned_date": {
       "anyOf": [
        {
@@ -7284,10 +7998,7 @@
      },
      "scope": {
       "default": "records",
-      "enum": [
-       "records",
-       "assets"
-      ],
+      "pattern": "^[a-z][a-z0-9_-]{1,19}$",
       "title": "Scope",
       "type": "string"
      },
@@ -7856,6 +8567,11 @@
        }
       ],
       "title": "Last Login"
+     },
+     "mfa_enabled": {
+      "default": false,
+      "title": "Mfa Enabled",
+      "type": "boolean"
      },
      "name": {
       "title": "Name",
@@ -9073,6 +9789,7 @@
   },
   "/api/v1/assets/maintenance": {
    "get": {
+    "description": "Cross-asset maintenance log. issues=true keeps entries with any checklist item or body not OK.",
     "operationId": "maintenance_log_api_v1_assets_maintenance_get",
     "parameters": [
      {
@@ -9089,6 +9806,109 @@
         }
        ],
        "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "asset_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Asset Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "issues",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Issues"
+      }
+     },
+     {
+      "in": "query",
+      "name": "body_condition",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Body Condition"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "date",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      },
      {
@@ -9148,6 +9968,7 @@
   },
   "/api/v1/assets/repairs": {
    "get": {
+    "description": "Cross-asset repair log. status, vendor and asset_type take comma lists.",
     "operationId": "repair_log_api_v1_assets_repairs_get",
     "parameters": [
      {
@@ -9164,6 +9985,141 @@
         }
        ],
        "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "vendor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Vendor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "asset_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Asset Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_min",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Min"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cost_max",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cost Max"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "date",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      },
      {
@@ -10254,6 +11210,7 @@
       }
      },
      {
+      "description": "Comma list of entity types",
       "in": "query",
       "name": "entity_type",
       "required": false,
@@ -10266,23 +11223,134 @@
          "type": "null"
         }
        ],
+       "description": "Comma list of entity types",
        "title": "Entity Type"
       }
      },
      {
+      "description": "Comma list of user ids; 0 means system jobs",
       "in": "query",
       "name": "user_id",
       "required": false,
       "schema": {
        "anyOf": [
         {
-         "type": "integer"
+         "type": "string"
         },
         {
          "type": "null"
         }
        ],
+       "description": "Comma list of user ids; 0 means system jobs",
        "title": "User Id"
+      }
+     },
+     {
+      "description": "Comma list of raw action strings",
+      "in": "query",
+      "name": "action",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list of raw action strings",
+       "title": "Action"
+      }
+     },
+     {
+      "description": "change, signin, deletion or other",
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "change, signin, deletion or other",
+       "title": "Category"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "timestamp",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      }
     ],
@@ -10314,6 +11382,33 @@
      }
     ],
     "summary": "List Audit Logs",
+    "tags": [
+     "audit"
+    ]
+   }
+  },
+  "/api/v1/audit-logs/filters": {
+   "get": {
+    "description": "Choices for the audit list filter panel: actions, areas and people that appear in the log.",
+    "operationId": "audit_filter_options_api_v1_audit_logs_filters_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AuditFilterOptions"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Audit Filter Options",
     "tags": [
      "audit"
     ]
@@ -10593,6 +11688,7 @@
   },
   "/api/v1/borrows": {
    "get": {
+    "description": "Borrow log. status, employee_ids and asset_type take comma lists; asset_type \"__none__\" means not an asset.",
     "operationId": "list_borrows_api_v1_borrows_get",
     "parameters": [
      {
@@ -10602,7 +11698,7 @@
       "schema": {
        "anyOf": [
         {
-         "pattern": "^(open|overdue|returned)$",
+         "pattern": "^((open|overdue|returned),?)+$",
          "type": "string"
         },
         {
@@ -10642,6 +11738,161 @@
         }
        ],
        "title": "Employee Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "employee_ids",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Ids"
+      }
+     },
+     {
+      "in": "query",
+      "name": "asset_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Asset Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "borrowed_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Borrowed From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "borrowed_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Borrowed To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "due_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Due From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "due_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Due To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "returned_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Returned From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "returned_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Returned To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "borrowed_date",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      },
      {
@@ -10793,6 +12044,7 @@
     ]
    },
    "patch": {
+    "description": "Correct any detail of an entry (system admins and itlog.manage). Audited with old and new values.",
     "operationId": "update_borrow_api_v1_borrows__borrow_id__patch",
     "parameters": [
      {
@@ -11251,6 +12503,177 @@
     ]
    }
   },
+  "/api/v1/departments": {
+   "get": {
+    "description": "Department master list, used by the employee form and filters.",
+    "operationId": "list_departments_api_v1_departments_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DepartmentResponse"
+         },
+         "title": "Response List Departments Api V1 Departments Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Departments",
+    "tags": [
+     "departments"
+    ]
+   },
+   "post": {
+    "operationId": "create_department_api_v1_departments_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DepartmentCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DepartmentResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Department",
+    "tags": [
+     "departments"
+    ]
+   }
+  },
+  "/api/v1/departments/{dept_id}": {
+   "delete": {
+    "operationId": "delete_department_api_v1_departments__dept_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "dept_id",
+      "required": true,
+      "schema": {
+       "title": "Dept Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Department",
+    "tags": [
+     "departments"
+    ]
+   },
+   "put": {
+    "description": "Rename a department; employees holding the old name follow the rename.",
+    "operationId": "update_department_api_v1_departments__dept_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "dept_id",
+      "required": true,
+      "schema": {
+       "title": "Dept Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DepartmentUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DepartmentResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Department",
+    "tags": [
+     "departments"
+    ]
+   }
+  },
   "/api/v1/documents": {
    "get": {
     "operationId": "list_documents_api_v1_documents_get",
@@ -11273,6 +12696,7 @@
       }
      },
      {
+      "description": "Comma list of categories",
       "in": "query",
       "name": "category",
       "required": false,
@@ -11285,6 +12709,7 @@
          "type": "null"
         }
        ],
+       "description": "Comma list of categories",
        "title": "Category"
       }
      },
@@ -11345,6 +12770,156 @@
        "default": false,
        "title": "Deleted",
        "type": "boolean"
+      }
+     },
+     {
+      "description": "Comma list: asset, employee, record, borrow, none",
+      "in": "query",
+      "name": "linked",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list: asset, employee, record, borrow, none",
+       "title": "Linked"
+      }
+     },
+     {
+      "description": "Comma list: expired, expiring, active, none",
+      "in": "query",
+      "name": "expiry",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list: expired, expiring, active, none",
+       "title": "Expiry"
+      }
+     },
+     {
+      "in": "query",
+      "name": "expiry_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Expiry From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "expiry_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Expiry To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "uploaded_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Uploaded From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "uploaded_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Uploaded To"
+      }
+     },
+     {
+      "description": "Comma list: pdf, image, text, office, other",
+      "in": "query",
+      "name": "file_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list: pdf, image, text, office, other",
+       "title": "File Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(title|category|expiry_date|size_bytes|created_at|updated_at|file_name)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sort"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      },
      {
@@ -11467,6 +13042,36 @@
      }
     ],
     "summary": "Categories",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/v1/documents/tab-counts": {
+   "get": {
+    "operationId": "document_tab_counts_api_v1_documents_tab_counts_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "integer"
+         },
+         "title": "Response Document Tab Counts Api V1 Documents Tab Counts Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Document Tab Counts",
     "tags": [
      "documents"
     ]
@@ -12576,6 +14181,248 @@
     "summary": "Guide",
     "tags": [
      "help"
+    ]
+   }
+  },
+  "/api/v1/history/{entity}/{entity_id}": {
+   "get": {
+    "operationId": "entity_history_api_v1_history__entity___entity_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity",
+      "required": true,
+      "schema": {
+       "enum": [
+        "asset",
+        "record",
+        "employee"
+       ],
+       "title": "Entity",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "title": "Entity Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 30,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "maximum": 100000,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HistoryPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Entity History",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/history/{entity}/{entity_id}/revert/{audit_id}": {
+   "post": {
+    "operationId": "restore_version_api_v1_history__entity___entity_id__revert__audit_id__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity",
+      "required": true,
+      "schema": {
+       "enum": [
+        "asset",
+        "record",
+        "employee"
+       ],
+       "title": "Entity",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "title": "Entity Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "audit_id",
+      "required": true,
+      "schema": {
+       "title": "Audit Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RestoreResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Restore Version",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/history/{entity}/{entity_id}/revert/{audit_id}/preview": {
+   "get": {
+    "operationId": "restore_preview_api_v1_history__entity___entity_id__revert__audit_id__preview_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity",
+      "required": true,
+      "schema": {
+       "enum": [
+        "asset",
+        "record",
+        "employee"
+       ],
+       "title": "Entity",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "title": "Entity Id",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "audit_id",
+      "required": true,
+      "schema": {
+       "title": "Audit Id",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RestorePreview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Restore Preview",
+    "tags": [
+     "history"
     ]
    }
   },
@@ -15399,6 +17246,7 @@
       }
      },
      {
+      "description": "Comma list: sent, failed, pending, processing, retry",
       "in": "query",
       "name": "status",
       "required": false,
@@ -15411,7 +17259,123 @@
          "type": "null"
         }
        ],
+       "description": "Comma list: sent, failed, pending, processing, retry",
        "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "description": "Comma list of record type ids",
+      "in": "query",
+      "name": "record_type_ids",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list of record type ids",
+       "title": "Record Type Ids"
+      }
+     },
+     {
+      "description": "Comma list of recipient ids",
+      "in": "query",
+      "name": "recipient_ids",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma list of recipient ids",
+       "title": "Recipient Ids"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(scheduled_date|sent_at|status|record|recipient|retry_count)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sort"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
       }
      }
     ],
@@ -16035,6 +17999,55 @@
     ]
    }
   },
+  "/api/v1/reminders/upcoming": {
+   "get": {
+    "description": "Overdue and upcoming renewals with each record's next reminder, for the Reminders page.",
+    "operationId": "upcoming_renewals_api_v1_reminders_upcoming_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 90,
+       "maximum": 365,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Upcoming Renewals",
+    "tags": [
+     "reminders"
+    ]
+   }
+  },
   "/api/v1/reports/allocation": {
    "get": {
     "description": "Exact-day license/ownership cost allocation across business units.",
@@ -16202,6 +18215,91 @@
        "pattern": "^(json|csv)$",
        "title": "Format",
        "type": "string"
+      }
+     },
+     {
+      "description": "JSON of the table's panel filters, keyed by column",
+      "in": "query",
+      "name": "filters",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 20000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "JSON of the table's panel filters, keyed by column",
+       "title": "Filters"
+      }
+     },
+     {
+      "description": "Text matched against every column",
+      "in": "query",
+      "name": "search",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Text matched against every column",
+       "title": "Search"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 50,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sort"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "asc",
+       "pattern": "^(asc|desc)$",
+       "title": "Order",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Comma-separated column keys to include",
+      "in": "query",
+      "name": "columns",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 2000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated column keys to include",
+       "title": "Columns"
       }
      },
      {
@@ -17725,6 +19823,118 @@
     ]
    }
   },
+  "/api/v1/settings/ai/models": {
+   "post": {
+    "operationId": "ai_models_api_v1_settings_ai_models_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AIProbe"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ai Models",
+    "tags": [
+     "workspace"
+    ]
+   }
+  },
+  "/api/v1/settings/ai/providers": {
+   "get": {
+    "operationId": "ai_providers_api_v1_settings_ai_providers_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ai Providers",
+    "tags": [
+     "workspace"
+    ]
+   }
+  },
+  "/api/v1/settings/ai/test": {
+   "post": {
+    "operationId": "ai_test_api_v1_settings_ai_test_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AIProbe"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ai Test",
+    "tags": [
+     "workspace"
+    ]
+   }
+  },
   "/api/v1/settings/asset-alerts": {
    "get": {
     "operationId": "get_alerts_api_v1_settings_asset_alerts_get",
@@ -18987,10 +21197,7 @@
       "required": false,
       "schema": {
        "default": "records",
-       "enum": [
-        "records",
-        "assets"
-       ],
+       "pattern": "^[a-z][a-z0-9_-]{1,19}$",
        "title": "Scope",
        "type": "string"
       }

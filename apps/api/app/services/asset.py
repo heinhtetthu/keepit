@@ -43,6 +43,7 @@ def _snapshot(a: Asset) -> dict[str, Any]:
                 "purchase_cost": a.purchase_cost, "currency": a.currency, "supplier": a.supplier,
                 "warranty_end_date": a.warranty_end_date, "employee_id": a.employee_id,
                 "assignment_status": a.assignment_status, "condition_status": a.condition_status,
+                "other_type_name": a.other_type_name, "notes": a.notes,
             }.items()}
 
 
@@ -175,12 +176,32 @@ async def asset_detail(db: AsyncSession, asset_id: int) -> dict[str, Any]:
     return data
 
 
-def borrow_view(b: AssetBorrow, serial: str | None = None) -> dict[str, Any]:
+def borrow_view(b: AssetBorrow, serial: str | None = None, asset_type: str | None = None) -> dict[str, Any]:
     overdue = bool(b.returned_date is None and b.expected_return_date and b.expected_return_date < _today())
     d = {c: getattr(b, c) for c in ("id", "asset_id", "item_name", "employee_id", "borrower_name", "borrower_email",
                                     "borrowed_date", "expected_return_date", "returned_date", "notes", "created_at")}
-    d.update(overdue=overdue, serial_number=serial)
+    d.update(overdue=overdue, serial_number=serial, asset_type=asset_type)
     return d
+
+
+def _jsonable(v: Any) -> Any:
+    return str(v) if isinstance(v, (date, datetime)) or v.__class__.__name__ == "Decimal" else v
+
+
+def _diff(row: Any, changes: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Old and new values of the fields that actually change (for the audit log)."""
+    old, new = {}, {}
+    for k, v in changes.items():
+        before = getattr(row, k, None)
+        if before != v:
+            old[k], new[k] = _jsonable(before), _jsonable(v)
+    return old, new
+
+
+def _not_null(changes: dict[str, Any], *fields: str) -> None:
+    for f in fields:
+        if f in changes and changes[f] is None:
+            raise ValidationException(f"{f.replace('_', ' ').capitalize()} cannot be empty")
 
 
 # ---------------------------------------------------------------- serials
@@ -497,11 +518,16 @@ async def _child(db: AsyncSession, model, asset_id: int, row_id: int):
 async def update_repair(db: AsyncSession, asset_id: int, repair_id: int, data: s.RepairUpdate, user_id: int) -> AssetRepair:
     asset = await get_asset(db, asset_id)
     row = await _child(db, AssetRepair, asset_id, repair_id)
-    for k, v in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    _not_null(changes, "repair_date", "issue", "status")
+    old, new = _diff(row, changes)
+    for k, v in changes.items():
         setattr(row, k, v)
     await db.flush()
     await _sync_repair_condition(db, asset)
-    await log_audit(db, "asset_repair.update", "asset", asset.id, asset.display_name, new_values=data.model_dump(mode="json", exclude_unset=True), user_id=user_id)
+    if new:
+        await log_audit(db, "asset_repair.update", "asset", asset.id, asset.display_name, old_values=old, new_values=new,
+                        user_id=user_id, details=f"Repair #{row.id} edited")
     return row
 
 
@@ -535,11 +561,16 @@ async def update_maintenance(db: AsyncSession, asset_id: int, log_id: int, data:
     asset = await get_asset(db, asset_id)
     row = await _child(db, AssetMaintenance, asset_id, log_id)
     changes = data.model_dump(exclude_unset=True)
+    _not_null(changes, "maintenance_date", "body_condition")
     if "components" in changes:
         changes["components"] = [c.model_dump() for c in data.components or []]
+    old, new = _diff(row, changes)
     for k, v in changes.items():
         setattr(row, k, v)
-    await log_audit(db, "asset_maintenance.update", "asset", asset.id, asset.display_name, new_values=data.model_dump(mode="json", exclude_unset=True), user_id=user_id)
+    await db.flush()
+    if new:
+        await log_audit(db, "asset_maintenance.update", "asset", asset.id, asset.display_name, old_values=old, new_values=new,
+                        user_id=user_id, details=f"Maintenance #{row.id} edited")
     return row
 
 
@@ -554,9 +585,7 @@ async def delete_maintenance(db: AsyncSession, asset_id: int, log_id: int, user_
 async def create_borrow(db: AsyncSession, data: s.BorrowCreate, user_id: int) -> AssetBorrow:
     asset = None
     if data.asset_id:
-        asset = await get_asset(db, data.asset_id)
-        if asset.assignment_status != "Unassigned" or asset.condition_status != "Operational":
-            raise ValidationException("Only unassigned, operational assets can be borrowed")
+        asset = await _lendable(db, data.asset_id)
     emp = await _employee(db, data.employee_id) if data.employee_id else None
     row = AssetBorrow(
         asset_id=asset.id if asset else None,
@@ -593,33 +622,105 @@ async def _release_borrowed_asset(db: AsyncSession, row: AssetBorrow) -> None:
             asset.assignment_status = "Unassigned"
 
 
+async def _lendable(db: AsyncSession, asset_id: int) -> Asset:
+    asset = await get_asset(db, asset_id)
+    if asset.assignment_status != "Unassigned" or asset.condition_status != "Operational":
+        raise ValidationException("Only unassigned, operational assets can be borrowed")
+    return asset
+
+
 async def update_borrow(db: AsyncSession, borrow_id: int, data: s.BorrowUpdate, user_id: int) -> AssetBorrow:
+    """Fix any detail of a borrow entry: item/asset, borrower, dates, notes.
+
+    Moving the entry to another asset, reopening it (clearing the returned
+    date) or closing it keeps the assets' Borrowed status in step."""
     row = await _borrow(db, borrow_id)
     changes = data.model_dump(exclude_unset=True)
-    if "employee_id" in changes and changes["employee_id"]:
-        emp = await _employee(db, changes["employee_id"])
-        changes.setdefault("borrower_name", emp.name)
-        changes.setdefault("borrower_email", emp.email)
-    was_open = row.returned_date is None
+    _not_null(changes, "borrowed_date")
+    if "item_name" in changes:
+        changes["item_name"] = (changes["item_name"] or "").strip()
+    if "borrower_name" in changes:
+        changes["borrower_name"] = (changes["borrower_name"] or "").strip()
+
+    # asset / item
+    new_asset: Asset | None = None
+    if "asset_id" in changes and changes["asset_id"] != row.asset_id:
+        if changes["asset_id"]:
+            new_asset = await get_asset(db, changes["asset_id"])
+            if not changes.get("item_name"):
+                changes["item_name"] = new_asset.display_name
+    else:
+        changes.pop("asset_id", None)
+    asset_after = changes.get("asset_id", row.asset_id)
+    if not asset_after and not changes.get("item_name", row.item_name):
+        raise ValidationException("Pick an asset or enter an item name")
+    if "item_name" in changes and not changes["item_name"]:
+        changes["item_name"] = row.item_name
+
+    # borrower
+    if "employee_id" in changes:
+        if changes["employee_id"]:
+            emp = await _employee(db, changes["employee_id"])
+            changes["borrower_name"] = emp.name
+            changes.setdefault("borrower_email", emp.email)
+        elif not changes.get("borrower_name"):
+            raise ValidationException("Pick an employee or enter a borrower name")
+    elif "borrower_name" in changes and not changes["borrower_name"]:
+        if row.employee_id:
+            changes.pop("borrower_name")
+        else:
+            raise ValidationException("Pick an employee or enter a borrower name")
+
+    # dates
+    borrowed = changes.get("borrowed_date", row.borrowed_date)
+    expected = changes.get("expected_return_date", row.expected_return_date)
+    returned = changes.get("returned_date", row.returned_date)
+    if expected and expected < borrowed:
+        raise ValidationException("Expected return date cannot be before the borrow date")
+    if returned and returned < borrowed:
+        raise ValidationException("Return date cannot be before the borrow date")
+    if returned and returned > _today():
+        raise ValidationException("Return date cannot be in the future")
+
+    was_open, open_after = row.returned_date is None, returned is None
+    asset_changed = "asset_id" in changes
+    old, new = _diff(row, changes)
+    # release what this entry held, then claim what it holds now
+    if was_open and row.asset_id and (asset_changed or not open_after):
+        await _release_borrowed_asset(db, row)
+    if open_after and asset_after and (asset_changed or not was_open):
+        target = new_asset or await get_asset(db, asset_after)
+        if target.assignment_status != "Unassigned" or target.condition_status != "Operational":
+            raise ValidationException("That asset is not available to lend: it is assigned, borrowed, in repair or written off")
+        target.assignment_status = "Borrowed"
     for k, v in changes.items():
         setattr(row, k, v)
-    if row.expected_return_date and row.expected_return_date < row.borrowed_date:
-        raise ValidationException("Expected return date cannot be before the borrow date")
-    if was_open and row.returned_date is not None:
-        await _release_borrowed_asset(db, row)
-    await log_audit(db, "borrow.update", "borrow", row.id, row.item_name, new_values=data.model_dump(mode="json", exclude_unset=True), user_id=user_id)
+    await db.flush()
+    if new:
+        await log_audit(db, "borrow.update", "borrow", row.id, row.item_name, old_values=old, new_values=new, user_id=user_id)
     return row
 
 
-async def return_borrow(db: AsyncSession, borrow_id: int, on: date | None, user_id: int) -> AssetBorrow:
+async def return_borrow(db: AsyncSession, borrow_id: int, on: date | None, user_id: int,
+                        condition: str | None = None, notes: str | None = None) -> AssetBorrow:
     row = await _borrow(db, borrow_id)
     if row.returned_date is not None:
         raise ValidationException("Already returned")
-    row.returned_date = on or _today()
-    if row.returned_date < row.borrowed_date:
+    when = on or _today()
+    if when < row.borrowed_date:
         raise ValidationException("Return date cannot be before the borrow date")
+    if when > _today():
+        raise ValidationException("Return date cannot be in the future")
+    row.returned_date = when
+    extra = [x for x in (f"Returned in {condition.strip()} condition" if condition and condition.strip() else None,
+                         (notes or "").strip() or None) if x]
+    if extra:
+        line = f"Return ({when.isoformat()}): " + ". ".join(extra)
+        row.notes = f"{row.notes}\n{line}" if row.notes else line
     await _release_borrowed_asset(db, row)
-    await log_audit(db, "borrow.return", "borrow", row.id, row.item_name, new_values={"returned_date": str(row.returned_date)}, user_id=user_id)
+    await log_audit(db, "borrow.return", "borrow", row.id, row.item_name,
+                    new_values={"returned_date": str(when), **({"condition": condition} if condition else {}),
+                                **({"notes": notes} if notes else {})}, user_id=user_id)
     return row
 
 
@@ -646,43 +747,127 @@ async def restore_borrow(db: AsyncSession, borrow_id: int, user_id: int) -> Asse
     return row
 
 
+NO_ASSET = "__none__"  # asset_type filter value for borrowed items that are not assets
+BORROW_SORT = {"borrowed_date": AssetBorrow.borrowed_date, "expected_return_date": AssetBorrow.expected_return_date,
+               "returned_date": AssetBorrow.returned_date, "item_name": AssetBorrow.item_name,
+               "borrower_name": AssetBorrow.borrower_name, "created_at": AssetBorrow.created_at, "asset_type": Asset.asset_type}
+
+
+def _between(stmt, col, start: date | None, end: date | None):
+    if start:
+        stmt = stmt.where(col >= start)
+    if end:
+        stmt = stmt.where(col <= end)
+    return stmt
+
+
+def _asset_type_cond(types: list[str]):
+    named = [t for t in types if t != NO_ASSET]
+    conds = [Asset.asset_type.in_(named)] if named else []
+    if NO_ASSET in types:
+        conds.append(Asset.id.is_(None))
+    return or_(*conds)
+
+
+def _ordered(stmt, col, order: str, tie):
+    col = col.asc() if order == "asc" else col.desc()
+    return stmt.order_by(col.nulls_last(), tie.desc())
+
+
+def _ids(v: str | None) -> list[int]:
+    return [int(x) for x in _csv(v) if x.isdigit()]
+
+
 async def list_borrows(db: AsyncSession, *, status: str | None = None, q: str | None = None, employee_id: int | None = None,
-                       deleted: bool = False, page: int = 1, page_size: int = 50) -> dict[str, Any]:
-    stmt = select(AssetBorrow, Asset.serial_number).outerjoin(Asset, Asset.id == AssetBorrow.asset_id).where(
+                       deleted: bool = False, page: int = 1, page_size: int = 50, employee_ids: str | None = None,
+                       asset_type: str | None = None, borrowed_from: date | None = None, borrowed_to: date | None = None,
+                       due_from: date | None = None, due_to: date | None = None, returned_from: date | None = None,
+                       returned_to: date | None = None, sort: str = "borrowed_date", order: str = "desc") -> dict[str, Any]:
+    stmt = select(AssetBorrow, Asset.serial_number, Asset.asset_type).outerjoin(Asset, Asset.id == AssetBorrow.asset_id).where(
         AssetBorrow.deleted_at.isnot(None) if deleted else AssetBorrow.deleted_at.is_(None))
-    if status == "open":
-        stmt = stmt.where(AssetBorrow.returned_date.is_(None))
-    elif status == "overdue":
-        stmt = stmt.where(AssetBorrow.returned_date.is_(None), AssetBorrow.expected_return_date < _today())
-    elif status == "returned":
-        stmt = stmt.where(AssetBorrow.returned_date.isnot(None))
+    statuses = set(_csv(status))
+    if statuses:
+        conds = []
+        if "open" in statuses:
+            conds.append(AssetBorrow.returned_date.is_(None))
+        if "overdue" in statuses:
+            conds.append((AssetBorrow.returned_date.is_(None)) & (AssetBorrow.expected_return_date < _today()))
+        if "returned" in statuses:
+            conds.append(AssetBorrow.returned_date.isnot(None))
+        stmt = stmt.where(or_(*conds))
     if employee_id:
         stmt = stmt.where(AssetBorrow.employee_id == employee_id)
+    if ids := _ids(employee_ids):
+        stmt = stmt.where(AssetBorrow.employee_id.in_(ids))
+    if types := _csv(asset_type):
+        stmt = stmt.where(_asset_type_cond(types))
+    stmt = _between(stmt, AssetBorrow.borrowed_date, borrowed_from, borrowed_to)
+    stmt = _between(stmt, AssetBorrow.expected_return_date, due_from, due_to)
+    stmt = _between(stmt, AssetBorrow.returned_date, returned_from, returned_to)
     if q:
         like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(AssetBorrow.item_name.ilike(like), AssetBorrow.borrower_name.ilike(like), Asset.serial_number.ilike(like)))
+        stmt = stmt.where(or_(AssetBorrow.item_name.ilike(like), AssetBorrow.borrower_name.ilike(like), Asset.serial_number.ilike(like),
+                              AssetBorrow.notes.ilike(like)))
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    rows = (await db.execute(stmt.order_by(AssetBorrow.borrowed_date.desc(), AssetBorrow.id.desc())
-                             .offset((page - 1) * page_size).limit(page_size))).all()
-    return {"items": [borrow_view(b, serial) for b, serial in rows], "page": page, "page_size": page_size,
+    stmt = _ordered(stmt, BORROW_SORT.get(sort, AssetBorrow.borrowed_date), order, AssetBorrow.id)
+    rows = (await db.execute(stmt.offset((page - 1) * page_size).limit(page_size))).all()
+    return {"items": [borrow_view(b, serial, kind) for b, serial, kind in rows], "page": page, "page_size": page_size,
             "total": total, "total_pages": max(1, ceil(total / page_size))}
 
 
-async def list_log(db: AsyncSession, model, date_col, *, q: str | None, page: int, page_size: int) -> dict[str, Any]:
+OK_STATUSES = ("Good", "Done", "Not Applicable")
+
+
+def _issues_found():
+    """Maintenance entries with any checklist item not Good/Done/N.A., or a body that is not Good."""
+    from sqlalchemy import exists, literal_column
+    elem = func.jsonb_array_elements(AssetMaintenance.components).table_valued("value").alias("c")
+    bad_component = exists(select(literal_column("1")).select_from(elem)
+                           .where(elem.c.value.op("->>")("status").notin_(OK_STATUSES)))
+    return or_(bad_component, AssetMaintenance.body_condition.notin_(OK_STATUSES + ("Repaired",)))
+
+
+async def list_log(db: AsyncSession, model, date_col, *, q: str | None, page: int, page_size: int,
+                   status: str | None = None, vendor: str | None = None, asset_type: str | None = None,
+                   date_from: date | None = None, date_to: date | None = None,
+                   cost_min: float | None = None, cost_max: float | None = None,
+                   issues: bool | None = None, body_condition: str | None = None,
+                   sort: str | None = None, order: str = "desc") -> dict[str, Any]:
     """Cross-asset repair or maintenance log (IT Logs page)."""
     stmt = select(model, Asset).join(Asset, Asset.id == model.asset_id).where(Asset.deleted_at.is_(None))
     if q:
         like = f"%{q.strip()}%"
-        conds = [Asset.serial_number.ilike(like), Asset.brand.ilike(like), Asset.model.ilike(like)]
+        conds = [Asset.serial_number.ilike(like), Asset.brand.ilike(like), Asset.model.ilike(like), model.notes.ilike(like)]
         if model is AssetRepair:
             conds += [AssetRepair.issue.ilike(like), AssetRepair.vendor.ilike(like)]
         stmt = stmt.where(or_(*conds))
+    if types := _csv(asset_type):
+        stmt = stmt.where(Asset.asset_type.in_(types))
+    stmt = _between(stmt, date_col, date_from, date_to)
+    sortable: dict[str, Any] = {"date": date_col, "asset": Asset.brand, "asset_type": Asset.asset_type, "created_at": model.created_at}
+    if model is AssetRepair:
+        if st := _csv(status):
+            stmt = stmt.where(AssetRepair.status.in_(st))
+        if vendors := _csv(vendor):
+            stmt = stmt.where(AssetRepair.vendor.in_(vendors))
+        if cost_min is not None:
+            stmt = stmt.where(AssetRepair.cost >= cost_min)
+        if cost_max is not None:
+            stmt = stmt.where(AssetRepair.cost <= cost_max)
+        sortable |= {"issue": AssetRepair.issue, "vendor": AssetRepair.vendor, "cost": AssetRepair.cost, "status": AssetRepair.status}
+    else:
+        if issues is not None:
+            stmt = stmt.where(_issues_found() if issues else ~_issues_found())
+        if bc := _csv(body_condition):
+            stmt = stmt.where(AssetMaintenance.body_condition.in_(bc))
+        sortable |= {"body_condition": AssetMaintenance.body_condition, "operating_system": AssetMaintenance.operating_system}
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
-    rows = (await db.execute(stmt.order_by(date_col.desc(), model.id.desc()).offset((page - 1) * page_size).limit(page_size))).unique().all()
+    stmt = _ordered(stmt, sortable.get(sort or "date", date_col), order, model.id)
+    rows = (await db.execute(stmt.offset((page - 1) * page_size).limit(page_size))).unique().all()
     items = []
     for row, asset in rows:
         d = {c.key: getattr(row, c.key) for c in model.__table__.columns}
-        d["asset_name"] = asset.display_name
+        d.update(asset_name=asset.display_name, asset_type=asset.asset_type, serial_number=asset.serial_number)
         items.append(d)
     return {"items": items, "page": page, "page_size": page_size, "total": total, "total_pages": max(1, ceil(total / page_size))}
 

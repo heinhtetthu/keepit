@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   BODY_CONDITIONS, OS_OPTIONS, REPAIR_STATUSES, TASK_STATUSES, BODY_CONDITIONS as STATUSES, errorMessage, maintenanceChecklist,
-  todayISO, useAssetMutation, useCurrency, useReference, type Asset, type Maintenance, type Repair,
+  formatDate, todayISO, useAssetMutation, useCurrency, useReference, type Asset, type Borrow, type Maintenance, type Repair,
 } from '@workspace/core'
 import Modal from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select'
 import Combobox from '@/components/ui/combobox'
 import { toast } from '@/components/ui/toaster'
 import { EmployeePicker, Field, inputCls } from './shared'
+import ITLogItemPicker, { type LendItem } from './ITLogItemPicker'
 
 const done = (msg: string, close: () => void) => ({ onSuccess: () => { toast.success(msg); close() }, onError: (e: unknown) => toast.error(errorMessage(e)) })
 
@@ -85,7 +86,7 @@ export function MaintenanceDialog({ asset, entry, onClose }: { asset: Pick<Asset
     </>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="Date" required><Input type="date" value={f.maintenance_date} onChange={(e) => setF({ ...f, maintenance_date: e.target.value })} /></Field>
-        <Field label="Operating system"><Select value={f.operating_system ?? ''} onChange={(e) => setF({ ...f, operating_system: e.target.value })}><option value="">—</option>{OS_OPTIONS.map((o) => <option key={o}>{o}</option>)}</Select></Field>
+        <Field label="Operating system"><Select value={f.operating_system ?? ''} onChange={(e) => setF({ ...f, operating_system: e.target.value })}><option value="">-</option>{OS_OPTIONS.map((o) => <option key={o}>{o}</option>)}</Select></Field>
         <Field label="Body condition"><Select value={f.body_condition} onChange={(e) => setF({ ...f, body_condition: e.target.value as typeof f.body_condition })}>{BODY_CONDITIONS.map((o) => <option key={o}>{o}</option>)}</Select></Field>
       </div>
       {components.length > 0 && (
@@ -105,27 +106,92 @@ export function MaintenanceDialog({ asset, entry, onClose }: { asset: Pick<Asset
   )
 }
 
-export function BorrowDialog({ asset, onClose }: { asset?: Pick<Asset, 'id' | 'display_name'>; onClose: () => void }) {
-  const [employeeId, setEmployeeId] = useState<number | null>(null)
-  const [f, setF] = useState({ item_name: '', borrower_name: '', borrowed_date: todayISO(), expected_return_date: '', notes: '' })
-  const m = useAssetMutation((a, _: void) => a.borrows.create({
-    asset_id: asset?.id ?? null, item_name: f.item_name || null, employee_id: employeeId, borrower_name: f.borrower_name || null,
-    borrowed_date: f.borrowed_date, expected_return_date: f.expected_return_date || null, notes: f.notes || null,
-  }))
+/** Lend an item (create) or fix any detail of an existing borrow entry (edit). */
+export function BorrowDialog({ asset, borrow, onClose }: { asset?: Pick<Asset, 'id' | 'display_name'>; borrow?: Borrow; onClose: () => void }) {
+  const editing = !!borrow
+  const [item, setItem] = useState<LendItem>(borrow ? (borrow.asset_id ? { kind: 'asset', id: borrow.asset_id } : { kind: 'other' }) : asset ? { kind: 'asset', id: asset.id } : null)
+  const [employeeId, setEmployeeId] = useState<number | null>(borrow?.employee_id ?? null)
+  const [f, setF] = useState({
+    item_name: borrow && !borrow.asset_id ? borrow.item_name : '',
+    borrower_name: borrow && !borrow.employee_id ? borrow.borrower_name : '',
+    borrowed_date: borrow?.borrowed_date ?? todayISO(), expected_return_date: borrow?.expected_return_date ?? '',
+    returned_date: borrow?.returned_date ?? '', notes: borrow?.notes ?? '',
+  })
+  const today = todayISO()
+  const current = useMemo(() => (borrow?.asset_id ? {
+    id: borrow.asset_id, asset_type: borrow.asset_type ?? 'Asset', other_type_name: null, brand: null, model: null,
+    serial_number: borrow.serial_number ?? null, display_name: borrow.item_name,
+  } : null), [borrow])
+  const other = item?.kind === 'other'
+  const assetId = item?.kind === 'asset' ? item.id : null
+  const dateError = f.expected_return_date && f.expected_return_date < f.borrowed_date ? 'Expected return cannot be before the borrow date'
+    : f.returned_date && f.returned_date < f.borrowed_date ? 'Return date cannot be before the borrow date'
+      : f.returned_date && f.returned_date > today ? 'Return date cannot be in the future' : ''
+  const m = useAssetMutation((a, _: void) => {
+    const who = { employee_id: employeeId, borrower_name: employeeId ? null : f.borrower_name.trim() || null }
+    const dates = { borrowed_date: f.borrowed_date, expected_return_date: f.expected_return_date || null }
+    if (borrow) {
+      return a.borrows.update(borrow.id, {
+        asset_id: assetId, ...(other ? { item_name: f.item_name.trim() } : {}), ...who,
+        ...(employeeId ? {} : { borrower_email: null }), ...dates, returned_date: f.returned_date || null, notes: f.notes.trim() || null,
+      })
+    }
+    return a.borrows.create({ asset_id: assetId, item_name: other ? f.item_name.trim() : null, ...who, ...dates, notes: f.notes.trim() || null })
+  })
+  const fixedAsset = !!asset && !borrow
+  const missingItem = !fixedAsset && (!item || (other && !f.item_name.trim()))
   return (
-    <Modal title="Lend item" subtitle={asset?.display_name ?? 'Untracked item (cable, adapter…)'} onClose={onClose} footer={<>
+    <Modal title={editing ? 'Edit borrow entry' : 'Lend item'} subtitle={fixedAsset ? asset.display_name : editing ? borrow.item_name : 'An asset we have, or anything else (cable, adapter…)'} onClose={onClose} footer={<>
       <Button variant="outline" onClick={onClose}>Cancel</Button>
-      <Button disabled={m.isPending || (!asset && !f.item_name.trim()) || (!employeeId && !f.borrower_name.trim())}
-        onClick={() => m.mutate(undefined, done('Borrow logged', onClose))}>Save</Button>
+      <Button disabled={m.isPending || missingItem || (!employeeId && !f.borrower_name.trim()) || !f.borrowed_date || !!dateError}
+        onClick={() => m.mutate(undefined, done(editing ? 'Borrow entry updated' : 'Borrow logged', onClose))}>Save</Button>
     </>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {!asset && <Field label="Item" required className="sm:col-span-2"><Input value={f.item_name} onChange={(e) => setF({ ...f, item_name: e.target.value })} /></Field>}
-        <Field label="Employee" className="sm:col-span-2"><EmployeePicker value={employeeId} onChange={setEmployeeId} /></Field>
+        {!fixedAsset && <Field label="Item" required className="sm:col-span-2"
+          hint={editing && borrow.returned_date === null && item?.kind === 'asset' && item.id !== borrow.asset_id ? 'The old asset becomes available again and the new one is marked Borrowed.' : undefined}>
+          <ITLogItemPicker value={item} onChange={setItem} current={current} autoOpen={!editing} />
+        </Field>}
+        {!fixedAsset && other && <Field label="Item name" required className="sm:col-span-2">
+          <Input autoFocus value={f.item_name} onChange={(e) => setF({ ...f, item_name: e.target.value })} placeholder="e.g. HDMI cable, USB-C adapter" />
+        </Field>}
+        <Field label="Employee" className="sm:col-span-2"><EmployeePicker value={employeeId} onChange={setEmployeeId} includeInactive={editing} /></Field>
         {!employeeId && <Field label="…or borrower name" className="sm:col-span-2"><Input value={f.borrower_name} onChange={(e) => setF({ ...f, borrower_name: e.target.value })} placeholder="Guest, contractor…" /></Field>}
-        <Field label="Borrowed on"><Input type="date" value={f.borrowed_date} onChange={(e) => setF({ ...f, borrowed_date: e.target.value })} /></Field>
+        <Field label="Borrowed on" required><Input type="date" value={f.borrowed_date} onChange={(e) => setF({ ...f, borrowed_date: e.target.value })} /></Field>
         <Field label="Expected return"><Input type="date" min={f.borrowed_date} value={f.expected_return_date} onChange={(e) => setF({ ...f, expected_return_date: e.target.value })} /></Field>
-        <Field label="Notes" className="sm:col-span-2"><Input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        {editing && <Field label="Returned on" hint={borrow.returned_date ? 'Clear it to mark the item as still out.' : 'Leave empty while the item is still out.'}>
+          <Input type="date" min={f.borrowed_date} max={today} value={f.returned_date} onChange={(e) => setF({ ...f, returned_date: e.target.value })} />
+        </Field>}
+        <Field label="Notes" className="sm:col-span-2"><textarea className={`${inputCls} h-16`} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        {dateError && <p className="text-sm text-red-600 sm:col-span-2">{dateError}</p>}
       </div>
+    </Modal>
+  )
+}
+
+const RETURN_CONDITIONS = ['Good', 'Fair', 'Damaged', 'Missing parts']
+
+/** Mark a borrowed item returned on a chosen date (not before it was borrowed, not in the future). */
+export function ReturnDialog({ borrow, onClose }: { borrow: Pick<Borrow, 'id' | 'item_name' | 'borrower_name' | 'borrowed_date'>; onClose: () => void }) {
+  const today = todayISO()
+  const [date, setDate] = useState(today < borrow.borrowed_date ? borrow.borrowed_date : today)
+  const [condition, setCondition] = useState('')
+  const [notes, setNotes] = useState('')
+  const m = useAssetMutation((a, _: void) => a.borrows.return(borrow.id, date, { condition: condition || null, notes: notes.trim() || null }))
+  const error = !date ? 'Pick the return date' : date < borrow.borrowed_date ? `Cannot be before the borrow date (${formatDate(borrow.borrowed_date)})` : date > today ? 'Cannot be in the future' : ''
+  return (
+    <Modal title="Return item" subtitle={`${borrow.item_name} · ${borrow.borrower_name}`} onClose={onClose} footer={<>
+      <Button variant="outline" onClick={onClose}>Cancel</Button>
+      <Button disabled={!!error || m.isPending} onClick={() => m.mutate(undefined, done('Marked returned', onClose))}>Mark returned</Button>
+    </>}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Returned on" required hint={`Borrowed ${formatDate(borrow.borrowed_date)}`}>
+          <Input type="date" min={borrow.borrowed_date} max={today} value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Condition"><Select value={condition} onChange={(e) => setCondition(e.target.value)}><option value="">Not recorded</option>{RETURN_CONDITIONS.map((c) => <option key={c}>{c}</option>)}</Select></Field>
+        <Field label="Notes" className="sm:col-span-2"><textarea className={`${inputCls} h-16`} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional, e.g. charger missing" /></Field>
+        {error && <p className="text-sm text-red-600 sm:col-span-2">{error}</p>}
+      </div>
+      <p className="mt-3 text-xs text-gray-500">The condition and notes are added to the entry&apos;s notes. A returned asset becomes available again.</p>
     </Modal>
   )
 }

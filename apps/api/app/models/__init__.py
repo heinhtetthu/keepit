@@ -9,6 +9,7 @@ from app.models.renewal import RecordRenewal
 from app.models.employee import Employee
 from app.models.assignment import RecordAssignment
 from app.models.business_unit import BusinessUnit
+from app.models.department import Department
 from app.models.reminder import ReminderRule, ReminderLog, NotificationRecipient, TelegramBot
 from app.models.audit import AuditLog
 from app.models.settings import SavedView, SystemSetting
@@ -27,6 +28,7 @@ __all__ = [
     "Record", "RecordValue", "RecordRenewal",
     "Employee", "RecordAssignment",
     "BusinessUnit",
+    "Department",
     "ReminderRule", "ReminderLog", "NotificationRecipient", "TelegramBot",
     "AuditLog", "SavedView", "SystemSetting",
     "ReferenceItem",

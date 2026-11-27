@@ -22,8 +22,8 @@ async def summary(db: AsyncSession) -> dict[str, Any]:
         "CROSS JOIN LATERAL jsonb_array_elements_text(e.business_units) AS bu(value) "
         "WHERE a.deleted_at IS NULL GROUP BY bu.value ORDER BY count(a.id) DESC LIMIT 12"))).all()]
     age_years = func.extract("year", func.age(d0, Asset.purchase_date))
-    bucket = case((Asset.purchase_date.is_(None), "Unknown"), (age_years < 1, "< 1 yr"), (age_years < 3, "1–3 yrs"),
-                  (age_years < 5, "3–5 yrs"), else_="5+ yrs")
+    bucket = case((Asset.purchase_date.is_(None), "Unknown"), (age_years < 1, "< 1 yr"), (age_years < 3, "1-3 yrs"),
+                  (age_years < 5, "3-5 yrs"), else_="5+ yrs")
     by_age = dict((await db.execute(select(bucket, func.count()).where(live).group_by(bucket))).all())
     warranty = (await db.execute(select(func.count()).where(live, Asset.warranty_end_date.between(d0, d0 + timedelta(days=60))))).scalar_one()
     open_b = AssetBorrow.returned_date.is_(None) & AssetBorrow.deleted_at.is_(None)

@@ -23,6 +23,9 @@ class Employee(Base, TimestampMixin, LegacyMixin):
     business_units: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, server_default="[]")
     regions: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, server_default="[]")
     title: Mapped[str | None] = mapped_column(String(100))
+    # Department name snapshot (master list: departments); renames follow.
+    department: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
     gender: Mapped[str | None] = mapped_column(String(20))
     avatar_url: Mapped[str | None] = mapped_column(Text)
     join_date: Mapped[date | None] = mapped_column(Date)

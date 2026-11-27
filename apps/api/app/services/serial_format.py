@@ -29,7 +29,7 @@ def validate_serial_format(fmt: str) -> str | None:
                 return "{SEQ:n} takes a digit count, e.g. {SEQ:4}. For a literal prefix, just write it directly (e.g. MSE-)."
             n = int(digits.group(1))
             if n < 1 or n > MAX_SEQ_DIGITS:
-                return f"{{SEQ:n}} supports 1–{MAX_SEQ_DIGITS} digits."
+                return f"{{SEQ:n}} supports 1-{MAX_SEQ_DIGITS} digits."
     return None
 
 

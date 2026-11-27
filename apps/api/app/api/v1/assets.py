@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,15 +66,28 @@ async def import_repairs(items: list[s.RepairImportItem], db: AsyncSession = DB,
 
 
 @router.get("/repairs")
-async def repair_log(q: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
+async def repair_log(q: str | None = None, status: str | None = None, vendor: str | None = None, asset_type: str | None = None,
+                     date_from: date | None = None, date_to: date | None = None,
+                     cost_min: float | None = None, cost_max: float | None = None,
+                     sort: str = "date", order: str = Query("desc", pattern="^(asc|desc)$"),
+                     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
                      db: AsyncSession = DB, user=Depends(require_permission("itlog.view"))):
-    return await svc.list_log(db, AssetRepair, AssetRepair.repair_date, q=q, page=page, page_size=page_size)
+    """Cross-asset repair log. status, vendor and asset_type take comma lists."""
+    return await svc.list_log(db, AssetRepair, AssetRepair.repair_date, q=q, page=page, page_size=page_size,
+                              status=status, vendor=vendor, asset_type=asset_type, date_from=date_from, date_to=date_to,
+                              cost_min=cost_min, cost_max=cost_max, sort=sort, order=order)
 
 
 @router.get("/maintenance")
-async def maintenance_log(q: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
+async def maintenance_log(q: str | None = None, asset_type: str | None = None, issues: bool | None = None,
+                          body_condition: str | None = None, date_from: date | None = None, date_to: date | None = None,
+                          sort: str = "date", order: str = Query("desc", pattern="^(asc|desc)$"),
+                          page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=500),
                           db: AsyncSession = DB, user=Depends(require_permission("itlog.view"))):
-    return await svc.list_log(db, AssetMaintenance, AssetMaintenance.maintenance_date, q=q, page=page, page_size=page_size)
+    """Cross-asset maintenance log. issues=true keeps entries with any checklist item or body not OK."""
+    return await svc.list_log(db, AssetMaintenance, AssetMaintenance.maintenance_date, q=q, page=page, page_size=page_size,
+                              asset_type=asset_type, issues=issues, body_condition=body_condition,
+                              date_from=date_from, date_to=date_to, sort=sort, order=order)
 
 
 # ---- settings: templates + auto serials (static paths before /{asset_id})

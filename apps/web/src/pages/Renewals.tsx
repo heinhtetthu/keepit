@@ -1,340 +1,156 @@
-﻿import { useState } from 'react'
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Trash2, Plus, Power, Pencil, X } from 'lucide-react'
+﻿import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlarmClock, BellRing, CalendarRange, ListChecks, Repeat, TriangleAlert, type LucideIcon } from 'lucide-react'
 import api from '@/lib/api'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { apiError } from '@/lib/seats'
 import { useAuthStore } from '../store/auth'
 import TypeIcon from '../components/TypeIcon'
+import { EmptyRows, useTableState } from '@/components/data-table'
+import UpcomingRenewals, { type UpcomingTab } from '@/components/renewals/UpcomingRenewals'
+import RuleBuilder from '@/components/renewals/RuleBuilder'
+import type { UpcomingResponse } from '@/components/renewals/shared'
+import { cn } from '@/lib/utils'
 import type { ReminderRule, RecordType } from '../types'
-import ReminderMessageEditor from '@/components/ReminderMessageEditor'
 
-const intervalLabel = (days: number) => (days === 0 ? 'On the day' : `${days} days before`)
+type Section = 'upcoming' | 'rules'
+const readWindow = () => { try { return Number(localStorage.getItem('renewals-window')) || 90 } catch { return 90 } }
 
 export default function Renewals() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   const { hasPermission, user } = useAuthStore()
-  const [editRule, setEditRule] = useState<ReminderRule | null>(null)
-  const [error, setError] = useState('')
-  const [activeType, setActiveType] = useState<number | null>(null)
+  const [sp, setSp] = useSearchParams()
+  const canSeeRecords = hasPermission('record.view')
+  const section: Section = sp.get('tab') === 'rules' || !canSeeRecords ? 'rules' : 'upcoming'
+  const typeParam = Number(sp.get('type')) || null
+  const [windowDays, setWindowState] = useState(readWindow)
+  const t = useTableState({ key: 'renewals', defaultSort: 'expiry_date', defaultOrder: 'asc', defaultColumns: ['due', 'expiry', 'reminder', 'auto_renew', 'cost'] })
 
-  const { data: rules, isLoading, error: loadError } = useQuery<ReminderRule[]>({
-    queryKey: ['reminder-rules', user?.id],
-    queryFn: async () => (await api.get('/reminders/rules')).data,
-    retry: 1,
+  const { data: rules, isLoading: rulesLoading, error: rulesError } = useQuery<ReminderRule[]>({
+    queryKey: ['reminder-rules', user?.id], queryFn: async () => (await api.get('/reminders/rules')).data, retry: 1,
+  })
+  const { data: recordTypes, isLoading: typesLoading } = useQuery<RecordType[]>({
+    queryKey: ['record-types', user?.id], queryFn: async () => (await api.get('/record-types')).data,
+  })
+  const upcoming = useQuery<UpcomingResponse>({
+    queryKey: ['renewals-upcoming', user?.id, windowDays],
+    queryFn: async () => (await api.get('/reminders/upcoming', { params: { days: windowDays } })).data,
+    enabled: canSeeRecords, retry: 1, placeholderData: (prev) => prev,
   })
 
-  const { data: recordTypes } = useQuery<RecordType[]>({
-    queryKey: ['record-types', user?.id],
-    queryFn: async () => (await api.get('/record-types')).data,
-  })
+  // Types with an expiry field first, then by name.
+  const types = useMemo(() => [...(recordTypes || [])].sort((a, b) => Number(!a.reminder_field_id) - Number(!b.reminder_field_id) || a.name.localeCompare(b.name)), [recordTypes])
+  const rulesByType = useMemo(() => {
+    const m = new Map<number, ReminderRule[]>()
+    for (const r of rules || []) m.set(r.record_type_id, [...(m.get(r.record_type_id) || []), r])
+    return m
+  }, [rules])
+  const selected = types.find((x) => x.id === typeParam) ?? types[0]
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['reminder-rules'] })
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  const go = (next: Partial<{ tab: Section; type: number | null }>) => {
+    const p = new URLSearchParams(sp)
+    if (next.tab) { if (next.tab === 'rules') p.set('tab', 'rules'); else p.delete('tab') }
+    if (next.type !== undefined) { if (next.type) p.set('type', String(next.type)); else p.delete('type') }
+    setSp(p, { replace: true })
   }
-
-  const createRule = useMutation({
-    mutationFn: async (payload: unknown) => api.post('/reminders/rules', payload),
-    onSuccess: invalidate,
-    onError: (err: any) => setError(err.response?.data?.error?.message || 'Failed to create rule'),
-  })
-
-  const toggleRule = useMutation({
-    mutationFn: async (rule: ReminderRule) => api.put(`/reminders/rules/${rule.id}`, { active: !rule.active }),
-    onSuccess: invalidate,
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to update rule'),
-  })
-
-  const saveRule = useMutation({
-    mutationFn: async (arg: { id: number; payload: unknown }) => api.put(`/reminders/rules/${arg.id}`, arg.payload),
-    onSuccess: () => { invalidate(); setEditRule(null) },
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to save rule'),
-  })
-
-  const deleteRule = useMutation({
-    mutationFn: async (id: number) => api.delete(`/reminders/rules/${id}`),
-    onSuccess: invalidate,
-    onError: (err: any) => alert(err.response?.data?.error?.message || 'Failed to delete rule'),
-  })
-
-  const canManage = hasPermission('reminder.create')
-  const canEdit = hasPermission('reminder.edit')
-  const canDelete = hasPermission('reminder.delete')
-
-  const grouped = new Map<number, ReminderRule[]>()
-  for (const rule of rules || []) {
-    const list = grouped.get(rule.record_type_id) || []
-    list.push(rule)
-    grouped.set(rule.record_type_id, list)
-  }
-
-  if (isLoading) return <div className="text-gray-500">Loading...</div>
-  if (loadError) {
-    return <div className="p-4 rounded-md bg-red-50 text-red-700 text-sm">Failed to load reminder rules.</div>
-  }
-
-  /* One tab per record type; the selected type shows its rule set */
-  // Types with an expiry field first; open on the first one that can have reminders.
-  const allTypes = [...(recordTypes || [])].sort((a, b) => Number(!a.reminder_field_id) - Number(!b.reminder_field_id))
-  const selectedId = activeType != null && allTypes.some((t) => t.id === activeType)
-    ? activeType
-    : allTypes[0]?.id ?? null
-  const selectedType = allTypes.find((t) => t.id === selectedId)
-  const selectedRules = (grouped.get(selectedId ?? -1) || [])
-    .slice()
-    .sort((a, b) => b.days_before - a.days_before)
-  const selectedReminderField = selectedType?.reminder_field_id
-    ? (selectedType.fields || []).find((f) => f.id === selectedType.reminder_field_id)?.name
-    : null
+  const setWindow = (n: number) => { setWindowState(n); try { localStorage.setItem('renewals-window', String(n)) } catch { /* storage unavailable */ } }
+  const pickTab = (tab: UpcomingTab) => { go({ tab: 'upcoming' }); t.setTab(tab) }
+  const s = upcoming.data?.summary
+  const activeRules = (rules || []).filter((r) => r.active).length
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Renewals &amp; Reminders</h1>
-        <p className="text-sm text-gray-500">
-          When a record's renewal/expiry date is within an interval below, the worker notifies all
-          active recipients via Telegram.
-        </p>
+    <div className="flex min-h-0 flex-col gap-4 animate-page-in">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-white"><BellRing className="h-5 w-5 text-gray-600" /></div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">Renewals &amp; Reminders</h1>
+            <p className="truncate text-sm text-gray-500">See what renews next and choose when Telegram reminds your team.</p>
+          </div>
+        </div>
       </div>
 
-      {error && <div className="p-3 rounded-md bg-red-50 text-red-700 text-sm">{error}</div>}
+      {canSeeRecords && (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <Stat icon={TriangleAlert} label="Overdue" value={s?.overdue} tone="red" hint="Past the renewal date" onClick={() => pickTab('overdue')} active={section === 'upcoming' && t.tab === 'overdue'} />
+          <Stat icon={AlarmClock} label="Due this week" value={s?.week} tone="amber" hint="Next 7 days" onClick={() => pickTab('week')} active={section === 'upcoming' && t.tab === 'week'} />
+          <Stat icon={CalendarRange} label="Due in 30 days" value={s?.month} tone="sky" hint="Including this week" onClick={() => pickTab('month')} active={section === 'upcoming' && t.tab === 'month'} />
+          <Stat icon={Repeat} label="Auto-renew on" value={s?.auto_renew_on} tone="emerald" hint={`Of ${(upcoming.data?.items.length ?? 0)} listed`} onClick={() => pickTab('auto')} active={section === 'upcoming' && t.tab === 'auto'} />
+        </div>
+      )}
 
-      {allTypes.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-gray-500">No record types configured yet.</CardContent>
-        </Card>
+      <div className="-mx-1 flex gap-1 border-b px-1" role="tablist">
+        {canSeeRecords && <SectionTab active={section === 'upcoming'} onClick={() => go({ tab: 'upcoming' })} icon={CalendarRange} label="Upcoming" count={upcoming.data ? upcoming.data.summary.window + upcoming.data.summary.overdue : undefined} />}
+        <SectionTab active={section === 'rules'} onClick={() => go({ tab: 'rules' })} icon={ListChecks} label="Rules & messages" count={rules ? activeRules : undefined} />
+      </div>
+
+      {section === 'upcoming' ? (
+        <UpcomingRenewals state={t} data={upcoming.data} loading={upcoming.isLoading} fetching={upcoming.isFetching}
+          error={upcoming.error ? apiError(upcoming.error, 'Could not load upcoming renewals.') : null}
+          windowDays={windowDays} onWindow={setWindow} recordTypes={types} canRenew={hasPermission('record.edit')}
+          onRules={(id) => go({ tab: 'rules', type: id })}
+          onRenewed={() => { qc.invalidateQueries({ queryKey: ['renewals-upcoming'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }) }} />
+      ) : rulesLoading || typesLoading ? (
+        <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />)}</div>
+      ) : rulesError ? (
+        <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">Could not load reminder rules.</div>
+      ) : !selected ? (
+        <div className="rounded-xl border bg-white"><EmptyRows icon={<ListChecks className="h-9 w-9" />} title="No record types yet" hint="Create a record type with a renewal or expiry date, then set up its reminders here." /></div>
       ) : (
-        <>
-          {/* Record-type tabs */}
-          <div className="flex gap-1 overflow-x-auto border-b border-gray-200 -mb-px [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {allTypes.map((rt) => {
-              const count = (grouped.get(rt.id) || []).length
-              const active = rt.id === selectedId
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
+          {/* Type picker: chips on phones, a list on wide screens */}
+          <nav aria-label="Record types" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
+            {types.map((rt) => {
+              const list = rulesByType.get(rt.id) || []
+              const on = list.filter((r) => r.active).length
+              const active = rt.id === selected.id
               return (
-                <button
-                  key={rt.id}
-                  onClick={() => setActiveType(rt.id)}
-                  aria-pressed={active}
-                  title={rt.name}
-                  className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                    active ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
-                  }`}
-                >
-                  <TypeIcon icon={rt.icon} className={active ? 'h-4 w-4 text-primary' : 'h-4 w-4 text-gray-400'} />
-                  {rt.name}
-                  {grouped.size > 0 && (
-                    <span
-                      className={`inline-flex items-center justify-center rounded-full px-1 text-[10px] font-bold h-[18px] min-w-[18px] ${
-                        active ? 'bg-primary text-primary-foreground' : 'bg-gray-200 text-gray-600'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
+                <button key={rt.id} onClick={() => go({ type: rt.id })} aria-current={active ? 'true' : undefined}
+                  className={cn('press flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg border px-3 py-2 text-left text-sm lg:w-full',
+                    active ? 'border-primary/40 bg-primary/5 text-gray-900' : 'border-transparent bg-white text-gray-600 hover:border-gray-200 hover:bg-gray-50 lg:bg-transparent')}>
+                  <TypeIcon icon={rt.icon} className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-gray-400')} />
+                  <span className="min-w-0 flex-1 truncate font-medium">{rt.name}</span>
+                  {!rt.reminder_field_id
+                    ? <span className="rounded-full bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700">Set up</span>
+                    : <span className={cn('rounded-full px-1.5 text-[11px] font-semibold tabular-nums', on ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400')} title={`${on} active of ${list.length}`}>{on}</span>}
                 </button>
               )
             })}
-          </div>
-
-          {/* Selected type's rule set */}
-          {selectedType && (
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-md bg-gray-50 border flex items-center justify-center shrink-0">
-                      <TypeIcon icon={selectedType.icon} className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{selectedType.name}</CardTitle>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {selectedReminderField
-                          ? <>Reminder field: <span className="text-gray-600">{selectedReminderField}</span></>
-                          : <span className="text-amber-600">No renewal/expiry field set - set one in Record Types → Manage fields</span>}
-                      </p>
-                    </div>
-                  </div>
-                  <a href={`/records/${selectedType.slug}`} className="text-xs text-primary hover:underline">View records →</a>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {selectedRules.length === 0 ? (
-                  <div className="py-6 text-center text-gray-500 text-sm border border-dashed rounded-md mb-2">
-                    No reminder rules for this type yet.
-                  </div>
-                ) : (
-                  <div className="border rounded-md divide-y">
-                    {selectedRules.map((rule) => (
-                      <div key={rule.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50">
-                        <div className="w-32 shrink-0">
-                          <span className="text-sm font-medium text-gray-800">{intervalLabel(rule.days_before)}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-xs text-gray-500">{rule.name}</span>
-                          {rule.template && <p className="text-[10px] text-gray-400 truncate">custom template</p>}
-                        </div>
-                        <Badge variant={rule.active ? 'success' : 'secondary'}>{rule.active ? 'Active' : 'Paused'}</Badge>
-                        {canEdit && (
-                          <button
-                            className="p-1.5 rounded text-gray-400 hover:text-gray-800 hover:bg-gray-100"
-                            title={rule.active ? 'Pause rule' : 'Resume rule'}
-                            onClick={() => toggleRule.mutate(rule)}
-                          >
-                            <Power className="h-4 w-4" />
-                          </button>
-                        )}
-                        {canEdit && (
-                          <button
-                            className="p-1.5 rounded text-gray-400 hover:text-gray-800 hover:bg-gray-100"
-                            title="Edit rule"
-                            onClick={() => setEditRule(rule)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            className="p-1.5 rounded text-gray-300 hover:text-red-600 hover:bg-red-50"
-                            title="Delete rule"
-                            onClick={() => { if (confirm(`Delete "${intervalLabel(rule.days_before)}"?`)) deleteRule.mutate(rule.id) }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {canManage && selectedReminderField && (
-                  <AddRuleRow
-                    onAdd={(days, name) => {
-                      setError('')
-                      createRule.mutate({ record_type_id: selectedType.id, name: name || intervalLabel(days), days_before: days, active: true })
-                    }}
-                    existingDays={selectedRules.map((r) => r.days_before)}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* Edit rule modal */}
-      {selectedType && <ReminderMessageEditor key={selectedType.id} recordType={selectedType} />}
-      {editRule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditRule(null)}>
-          <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Edit reminder rule</CardTitle>
-                <button onClick={() => setEditRule(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400" aria-label="Close">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  const fd = new FormData(e.target as HTMLFormElement)
-                  const days = Number(fd.get('days_before'))
-                  const name = String(fd.get('name') || '').trim()
-                  const template = String(fd.get('template') || '').trim()
-                  const active = fd.get('active') === 'on'
-                  saveRule.mutate({
-                    id: editRule.id,
-                    payload: {
-                      name: name || intervalLabel(days),
-                      days_before: days,
-                      active,
-                      template: template || null,
-                    },
-                  })
-                }}
-              >
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">Days before</label>
-                    <Input name="days_before" type="number" min={0} max={365} defaultValue={editRule.days_before} required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-sm font-medium">Name</label>
-                    <Input name="name" defaultValue={editRule.name} placeholder={intervalLabel(editRule.days_before)} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Rule-specific message (optional)</label>
-                  <textarea
-                    name="template"
-                    defaultValue={editRule.template || ''}
-                    placeholder={'🔔 {record_type} Renewal Reminder\n\n{record_name}\n\nRenewal Date: {renewal_date}\nDays Remaining: {days_remaining}\n\nView: {record_url}'}
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono text-xs"
-                  />
-                  <p className="text-xs text-gray-400">
-                    Leave empty to use this record type's shared message. Core variables and this type's field tokens from the message editor below are supported.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" name="active" defaultChecked={editRule.active} />
-                  Rule active
-                </label>
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button type="button" variant="outline" onClick={() => setEditRule(null)}>Cancel</Button>
-                  <Button type="submit" disabled={saveRule.isPending}>
-                    {saveRule.isPending ? 'Saving...' : 'Save rule'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          </nav>
+          <RuleBuilder key={selected.id} recordType={selected} rules={rulesByType.get(selected.id) || []} />
         </div>
       )}
     </div>
   )
 }
 
-function AddRuleRow({ onAdd, existingDays }: { onAdd: (days: number, name: string) => void; existingDays: number[] }) {
-  const [days, setDays] = useState('')
-  const [name, setName] = useState('')
-  const dupe = days !== '' && existingDays.includes(Number(days))
+const TONES = {
+  red: 'bg-red-50 text-red-600', amber: 'bg-amber-50 text-amber-600', sky: 'bg-sky-50 text-sky-600', emerald: 'bg-emerald-50 text-emerald-600',
+} as const
 
+function Stat({ icon: Icon, label, value, hint, tone, onClick, active }: {
+  icon: LucideIcon; label: string; value?: number; hint: string; tone: keyof typeof TONES; onClick: () => void; active: boolean
+}) {
   return (
-    <form
-      className="flex flex-wrap gap-2 items-center pt-3 mt-3 border-t"
-      onSubmit={(e) => {
-        e.preventDefault()
-        const d = Number(days)
-        if (isNaN(d) || d < 0 || d > 365 || dupe) return
-        onAdd(d, name.trim())
-        setDays('')
-        setName('')
-      }}
-    >
-      <Input
-        type="number"
-        min={0}
-        max={365}
-        placeholder="Days before (0 = on the day)"
-        value={days}
-        onChange={(e) => setDays(e.target.value)}
-        className="w-52 h-9"
-      />
-      <Input
-        placeholder="Custom name (optional)"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-52 h-9"
-      />
-      <Button type="submit" size="sm" className="h-9" disabled={days === '' || dupe}>
-        <Plus className="h-4 w-4 mr-1" /> Add reminder
-      </Button>
-      {dupe && <span className="text-xs text-red-500">That interval already exists</span>}
-    </form>
+    <button type="button" onClick={onClick} aria-pressed={active}
+      className={cn('card-hover press flex min-w-0 items-center gap-3 rounded-xl border bg-white p-3 text-left sm:p-4', active && 'border-primary/50 ring-2 ring-primary/15')}>
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10', TONES[tone])}><Icon className="h-4 w-4 sm:h-5 sm:w-5" /></span>
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-medium text-gray-500">{label}</span>
+        <span className="block text-xl font-semibold tabular-nums text-gray-900 animate-pop-in sm:text-2xl" key={value ?? 'x'}>{value ?? '-'}</span>
+        <span className="hidden truncate text-[11px] text-gray-400 sm:block">{hint}</span>
+      </span>
+    </button>
+  )
+}
+
+function SectionTab({ active, onClick, icon: Icon, label, count }: { active: boolean; onClick: () => void; icon: LucideIcon; label: string; count?: number }) {
+  return (
+    <button role="tab" aria-selected={active} onClick={onClick}
+      className={cn('-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+        active ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800')}>
+      <Icon className={cn('h-4 w-4', active ? 'text-primary' : 'text-gray-400')} />{label}
+      {count !== undefined && <span className={cn('rounded-full px-1.5 py-0.5 text-xs tabular-nums', active ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500')}>{count}</span>}
+    </button>
   )
 }

@@ -184,6 +184,8 @@ class RepairResponse(RepairCreate):
     asset_id: int
     created_at: datetime
     asset_name: str | None = None
+    asset_type: str | None = None
+    serial_number: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -221,6 +223,8 @@ class MaintenanceResponse(MaintenanceCreate):
     asset_id: int
     created_at: datetime
     asset_name: str | None = None
+    asset_type: str | None = None
+    serial_number: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -247,6 +251,7 @@ class BorrowCreate(BaseModel):
 
 
 class BorrowUpdate(BaseModel):
+    asset_id: int | None = None
     item_name: str | None = Field(default=None, max_length=300)
     employee_id: int | None = None
     borrower_name: str | None = Field(default=None, max_length=200)
@@ -259,6 +264,8 @@ class BorrowUpdate(BaseModel):
 
 class ReturnRequest(BaseModel):
     returned_date: date | None = None
+    condition: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class BorrowResponse(BaseModel):
@@ -274,6 +281,7 @@ class BorrowResponse(BaseModel):
     notes: str | None
     overdue: bool = False
     serial_number: str | None = None
+    asset_type: str | None = None
     created_at: datetime
     model_config = {"from_attributes": True}
 

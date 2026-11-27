@@ -18,7 +18,7 @@ function collect(children: ReactNode, out: ComboOption[] = []): ComboOption[] {
     if (el.type === 'option') {
       if (el.props.disabled && el.props.value === '') return
       const label = text(el.props.children)
-      out.push({ value: el.props.value !== undefined ? String(el.props.value) : label, label: label || '—' })
+      out.push({ value: el.props.value !== undefined ? String(el.props.value) : label, label: label || '-' })
     } else if (el.props?.children) {
       collect(el.props.children, out)
     }

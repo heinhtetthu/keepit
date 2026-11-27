@@ -10,6 +10,7 @@ import SearchableSelect from '@/components/SearchableSelect'
 import { toast } from '@/components/ui/toaster'
 import { Field } from '@/components/assets/shared'
 import { cn } from '@/lib/utils'
+import { countryOptions } from '@/lib/countries'
 
 export interface EmployeeFormValue {
   id?: number
@@ -18,19 +19,22 @@ export interface EmployeeFormValue {
   phone?: string | null
   title?: string | null
   business_units?: string[]
+  department?: string | null
+  country?: string | null
   join_date?: string | null
   resignation_date?: string | null
   gender?: string | null
   active?: boolean
 }
 
-/** Add or edit an employee: contact, job, business units (multi-select) and employment dates. */
+/** Add or edit an employee: contact, job, department, country, business units (multi-select) and employment dates. */
 export default function EmployeeFormDialog({ employee, onClose, onSaved }: { employee?: EmployeeFormValue; onClose: () => void; onSaved?: () => void }) {
   const qc = useQueryClient()
   const { data: units = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ['business-units'], queryFn: async () => (await api.get('/business-units')).data })
+  const { data: departments = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ['departments'], queryFn: async () => (await api.get('/departments')).data })
   const [f, setF] = useState({
     name: employee?.name ?? '', email: employee?.email ?? '', phone: employee?.phone ?? '', title: employee?.title ?? '',
-    business_units: employee?.business_units ?? [], join_date: employee?.join_date ?? '', gender: employee?.gender ?? '',
+    business_units: employee?.business_units ?? [], department: employee?.department ?? '', country: employee?.country ?? '', join_date: employee?.join_date ?? '', gender: employee?.gender ?? '',
     resigned: employee ? employee.active === false : false, resignation_date: employee?.resignation_date ?? '',
   })
   const [busy, setBusy] = useState(false)
@@ -40,14 +44,14 @@ export default function EmployeeFormDialog({ employee, onClose, onSaved }: { emp
     setBusy(true)
     const body = {
       name: f.name.trim(), email: f.email.trim() || null, phone: f.phone.trim() || null, title: f.title.trim() || null,
-      business_units: f.business_units, join_date: f.join_date || null, gender: f.gender || null,
+      business_units: f.business_units, department: f.department || null, country: f.country || null, join_date: f.join_date || null, gender: f.gender || null,
       active: !f.resigned, resignation_date: f.resigned ? (f.resignation_date || todayISO()) : null,
     }
     try {
       if (employee?.id) await api.put(`/employees/${employee.id}`, body)
       else await api.post('/employees', body)
       toast.success(employee?.id ? `${body.name} updated` : `${body.name} added`)
-      qc.invalidateQueries({ queryKey: ['employees'] }); qc.invalidateQueries({ queryKey: ['employee-overview'] })
+      qc.invalidateQueries({ queryKey: ['employees'] }); qc.invalidateQueries({ queryKey: ['employee-overview'] }); qc.invalidateQueries({ queryKey: ['departments'] })
       onSaved?.(); onClose()
     } catch (e) { toast.error(errorMessage(e)) } finally { setBusy(false) }
   }
@@ -67,6 +71,13 @@ export default function EmployeeFormDialog({ employee, onClose, onSaved }: { emp
         <section className="grid gap-3 sm:grid-cols-2">
           <Field label="Job title"><Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="e.g. Accountant" /></Field>
           <Field label="Gender"><Select value={f.gender} onChange={(e) => setF({ ...f, gender: e.target.value })}><option value="">Not set</option>{GENDERS.map((g) => <option key={g}>{g}</option>)}</Select></Field>
+          <Field label="Department">
+            <SearchableSelect options={[...(f.department && !departments.some((d) => d.name === f.department) ? [f.department] : []), ...departments.map((d) => d.name)].map((n) => ({ value: n, label: n }))}
+              value={f.department} onChange={(v) => setF({ ...f, department: v as string })} placeholder="Choose a department…" />
+          </Field>
+          <Field label="Country">
+            <SearchableSelect options={countryOptions(f.country)} value={f.country} onChange={(v) => setF({ ...f, country: v as string })} placeholder="Choose a country…" />
+          </Field>
           <Field label="Business units" className="sm:col-span-2" hint="Pick one or more">
             <SearchableSelect multiple options={units.map((u) => ({ value: u.name, label: u.name }))} value={f.business_units}
               onChange={(v) => setF({ ...f, business_units: v as string[] })} placeholder="Choose business units…" />

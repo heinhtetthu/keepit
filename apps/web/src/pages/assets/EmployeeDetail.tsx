@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { pushRecent } from '@/store/recent'
 import { AssignmentBadge, EmptyState, Tabs, useCan } from '@/components/assets/shared'
 import { LinkedDocuments } from '@/components/documents/DocumentDialogs'
+import EntityHistory from '@/components/history/EntityHistory'
 
 type Tab = 'assets' | 'seats' | 'history' | 'borrows' | 'documents'
 
@@ -19,12 +20,13 @@ export default function EmployeeDetail() {
   const navigate = useNavigate()
   const can = useCan()
   const { data, isLoading } = useEmployeeOverview(id)
-  const [tab, setTab] = useState<Tab>('assets')
+  const [tab, setTab] = useState<Tab>(() => (can('asset.view') ? 'assets' : 'history'))
   const [editing, setEditing] = useState(false)
   useEffect(() => { if (data) pushRecent({ url: `/employees/${id}`, label: data.employee.name, sublabel: 'Employee', kind: 'page', icon: null }) }, [data, id])
   if (isLoading) return <p className="p-8 text-center text-sm text-gray-400">Loading…</p>
   if (!data) return <EmptyState title="Employee not found" />
   const e = data.employee
+  const extra = e as { department?: string | null; country?: string | null }
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft className="h-4 w-4" />Back</button>
@@ -32,13 +34,14 @@ export default function EmployeeDetail() {
         <Avatar name={e.name} size="lg" />
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{e.name}</h1>
-          <p className="text-sm text-gray-500">{[e.title, (e.business_units ?? []).join(', ')].filter(Boolean).join(' · ') || '—'}</p>
+          <p className="text-sm text-gray-500">{[e.title, extra.department, (e.business_units ?? []).join(', ')].filter(Boolean).join(' · ') || '-'}</p>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
             {e.email && <a className="inline-flex items-center gap-1 hover:underline" href={`mailto:${e.email}`}><Mail className="h-3 w-3" />{e.email}</a>}
             {e.phone && <a className="inline-flex items-center gap-1 hover:underline" href={`tel:${e.phone}`}><Phone className="h-3 w-3" />{e.phone}</a>}
             {e.join_date && <span>Joined {formatDate(e.join_date)}</span>}
             {e.resignation_date && <span>Left {formatDate(e.resignation_date)}</span>}
             {(e.regions ?? []).length > 0 && <span>{(e.regions ?? []).join(', ')}</span>}
+            {extra.country && <span>Country: {extra.country}</span>}
           </div>
         </div>
         {e.active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Resigned</Badge>}
@@ -47,16 +50,15 @@ export default function EmployeeDetail() {
       </CardContent></Card>
 
       <Tabs value={tab} onChange={setTab} tabs={[
-        ...(can('asset.view') ? [{ key: 'assets' as const, label: 'Assets', count: data.assets.length }, { key: 'history' as const, label: 'Asset history', count: data.asset_history.length }, { key: 'borrows' as const, label: 'Borrows', count: data.borrows.length }] : []),
+        ...(can('asset.view') ? [{ key: 'assets' as const, label: 'Assets', count: data.assets.length }, { key: 'borrows' as const, label: 'Borrows', count: data.borrows.length }] : []),
         ...(can('record.view') ? [{ key: 'seats' as const, label: 'License seats', count: data.seats.length }] : []),
         ...(can('document.view') ? [{ key: 'documents' as const, label: 'Documents' }] : []),
+        { key: 'history' as const, label: 'History' },
       ]} />
       {tab === 'assets' && (data.assets.length ? <ul className="divide-y rounded-lg border bg-white">{data.assets.map((a) => (
         <li key={a.id} className="flex items-center gap-3 px-4 py-2.5"><Link className="flex-1 text-sm font-medium hover:underline" to={`/assets/${a.id}`}>{a.display_name}</Link><span className="text-xs text-gray-500">{a.asset_type}</span><AssignmentBadge status={a.assignment_status} /></li>
       ))}</ul> : <EmptyState title="Holds no assets" />)}
-      {tab === 'history' && (data.asset_history.length ? <ul className="divide-y rounded-lg border bg-white">{data.asset_history.map((h) => (
-        <li key={h.id} className="px-4 py-2.5 text-sm"><Link className="font-medium hover:underline" to={`/assets/${h.asset_id}`}>{h.asset_name}</Link><p className="text-xs text-gray-500">{formatDate(h.assigned_from)} → {h.assigned_to ? formatDate(h.assigned_to) : 'now'}</p></li>
-      ))}</ul> : <EmptyState title="No asset history" />)}
+      {tab === 'history' && <EntityHistory entity="employee" id={id} />}
       {tab === 'borrows' && (data.borrows.length ? <ul className="divide-y rounded-lg border bg-white">{data.borrows.map((b) => (
         <li key={b.id} className="flex items-center px-4 py-2.5 text-sm"><span className="flex-1">{b.item_name}<span className="block text-xs text-gray-500">{formatDate(b.borrowed_date)} → {b.returned_date ? formatDate(b.returned_date) : `due ${formatDate(b.expected_return_date)}`}</span></span>{b.overdue && <span className="text-xs font-medium text-red-600">Overdue</span>}</li>
       ))}</ul> : <EmptyState title="No borrows" />)}

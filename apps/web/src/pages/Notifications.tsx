@@ -10,11 +10,14 @@ import Modal from '@/components/ui/modal'
 import RowMenu from '@/components/ui/menu'
 import Avatar from '@/components/ui/avatar'
 import Combobox from '@/components/ui/combobox'
-import { TablePager } from '../components/table_shell'
+import {
+  DataTable, EmptyRows, TableTabs, TableToolbar, TitleCell, clientRows, csv, filterField, range, useTableState,
+  type Column, type SortDef, type TableState,
+} from '@/components/data-table'
 import { cn } from '@/lib/utils'
 import { apiError } from '@/lib/seats'
 import { useAuthStore } from '../store/auth'
-import type { NotificationRecipient, TelegramBot } from '../types'
+import type { NotificationRecipient, RecordType, TelegramBot } from '../types'
 
 interface ReminderLog {
   id: number
@@ -38,46 +41,47 @@ interface Health {
   attention: string[]
 }
 
-type Tab = 'activity' | 'recipients' | 'bots'
-type Status = '' | 'sent' | 'failed' | 'pending'
+type Section = 'activity' | 'recipients' | 'bots'
 
 const STATUS_META: Record<string, { icon: typeof CheckCircle2; tone: string; label: string }> = {
-  sent: { icon: CheckCircle2, tone: 'text-emerald-600 bg-emerald-50', label: 'Delivered' },
-  failed: { icon: XCircle, tone: 'text-red-600 bg-red-50', label: 'Failed' },
-  pending: { icon: Clock, tone: 'text-amber-600 bg-amber-50', label: 'Queued' },
+  sent: { icon: CheckCircle2, tone: 'text-emerald-700 bg-emerald-50', label: 'Delivered' },
+  failed: { icon: XCircle, tone: 'text-red-700 bg-red-50', label: 'Failed' },
+  pending: { icon: Clock, tone: 'text-amber-700 bg-amber-50', label: 'Queued' },
+  processing: { icon: Clock, tone: 'text-amber-700 bg-amber-50', label: 'Sending' },
+  retry: { icon: Clock, tone: 'text-amber-700 bg-amber-50', label: 'Retrying' },
 }
+/** Delivery tabs: the status cards at the top pick one. */
+const STATUS_TABS: Record<string, string | undefined> = { all: undefined, sent: 'sent', pending: 'pending,processing,retry', failed: 'failed' }
+const STATUS_CHOICES = [{ value: 'sent', label: 'Delivered' }, { value: 'failed', label: 'Failed' }, { value: 'pending', label: 'Queued' }, { value: 'processing', label: 'Sending' }, { value: 'retry', label: 'Retrying' }]
 
-function dayLabel(iso: string) {
-  const d = new Date(iso)
-  const today = new Date()
-  const diff = Math.round((new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86400000)
-  if (diff === 0) return 'Today'
-  if (diff === 1) return 'Yesterday'
-  return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' })
+const dash = <span className="text-gray-400">-</span>
+const when = (l: ReminderLog) => l.sent_at || l.scheduled_date
+const fmtWhen = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+function StatusPill({ status }: { status: string }) {
+  const m = STATUS_META[status] ?? STATUS_META.pending
+  return <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', m.tone)}><m.icon className="h-3 w-3" />{m.label}</span>
 }
+const ActivePill = ({ active, off = 'Paused' }: { active: boolean; off?: string }) => (
+  <span className={cn('inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500')}>{active ? 'Active' : off}</span>
+)
 
 export default function Notifications() {
   const qc = useQueryClient()
   const { hasPermission, user } = useAuthStore()
-  const [tab, setTab] = useState<Tab>('activity')
-  const [status, setStatus] = useState<Status>('')
-  const [page, setPage] = useState(1)
+  const [section, setSection] = useState<Section>('activity')
   const [recipientForm, setRecipientForm] = useState<NotificationRecipient | 'new' | null>(null)
   const [botForm, setBotForm] = useState<TelegramBot | 'new' | null>(null)
   const canManageBots = hasPermission('reminder.create')
   const canEditBots = hasPermission('reminder.edit')
   const canDeleteBots = hasPermission('reminder.delete')
   const canManageRecipients = !!user?.is_superuser
+  const deliveries = useTableState({ key: 'deliveries', defaultSort: 'scheduled_date', defaultOrder: 'desc', defaultColumns: ['status', 'timing', 'recipient', 'when'] })
 
-  const { data: health } = useQuery<Health>({
+  const { data: health, isFetching } = useQuery<Health>({
     queryKey: ['notification-health', user?.id],
     queryFn: async () => (await api.get('/operations/notifications')).data,
     refetchInterval: 30_000,
-  })
-  const { data: logs, isLoading, isFetching } = useQuery<{ items: ReminderLog[]; total: number; total_pages: number }>({
-    queryKey: ['reminder-logs', page, status],
-    queryFn: async () => (await api.get('/reminders/logs', { params: { page, page_size: 30, status: status || undefined } })).data,
-    placeholderData: (prev) => prev,
   })
   const { data: bots = [] } = useQuery<TelegramBot[]>({ queryKey: ['telegram-bots'], queryFn: async () => (await api.get('/reminders/bots')).data })
   const { data: recipients = [] } = useQuery<NotificationRecipient[]>({
@@ -85,19 +89,9 @@ export default function Notifications() {
     queryFn: async () => (await api.get('/reminders/recipients?active_only=false')).data,
   })
 
-  const groups = useMemo(() => {
-    const out: { day: string; items: ReminderLog[] }[] = []
-    for (const log of logs?.items || []) {
-      const day = dayLabel(log.sent_at || log.scheduled_date)
-      if (out[out.length - 1]?.day !== day) out.push({ day, items: [] })
-      out[out.length - 1].items.push(log)
-    }
-    return out
-  }, [logs])
-
   const workersOk = health ? Object.values(health.workers).every((w) => w.healthy) : true
   const counts = health?.counts || {}
-  const stats: { id: Status; label: string; value: number; icon: typeof CheckCircle2; tone: string }[] = [
+  const stats: { id: string; label: string; value: number; icon: typeof CheckCircle2; tone: string }[] = [
     { id: 'sent', label: 'Delivered', value: counts.sent || 0, icon: CheckCircle2, tone: 'text-emerald-600' },
     { id: 'pending', label: 'Queued', value: (counts.pending || 0) + (counts.processing || 0) + (counts.retry || 0), icon: Clock, tone: 'text-amber-600' },
     { id: 'failed', label: 'Failed', value: counts.failed || 0, icon: XCircle, tone: 'text-red-600' },
@@ -106,19 +100,26 @@ export default function Notifications() {
   const refresh = () => ['reminder-logs', 'notification-health', 'recipients', 'telegram-bots'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }))
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Notifications</h1>
-          <p className="text-sm text-gray-500">Telegram alerts for renewals that need a human. Auto-renewing records don't send alerts.</p>
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-white"><BellRing className="h-5 w-5 text-gray-600" /></div>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">Notifications</h1>
+            <p className="truncate text-sm text-gray-500">Telegram alerts for renewals that need a human. Auto-renewing records don't send alerts.</p>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={refresh}><RefreshCw className={cn('h-3.5 w-3.5 sm:mr-1.5', isFetching && 'animate-spin')} /><span className="hidden sm:inline">Refresh</span></Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={refresh}><RefreshCw className={cn('h-3.5 w-3.5 sm:mr-1.5', isFetching && 'animate-spin')} /><span className="hidden sm:inline">Refresh</span></Button>
+          {section === 'recipients' && canManageRecipients && <Button size="sm" onClick={() => setRecipientForm('new')}><Plus className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Add recipient</span></Button>}
+          {section === 'bots' && canManageBots && <Button size="sm" onClick={() => setBotForm('new')}><Plus className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Add bot</span></Button>}
+        </div>
       </div>
 
-      {/* Health + stats */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Health + delivery presets */}
+      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
         <div className={cn('col-span-2 flex items-center gap-3 rounded-xl border p-4 md:col-span-1', workersOk ? 'bg-white' : 'border-amber-200 bg-amber-50')}>
-          <span className={cn('relative flex h-3 w-3')}>
+          <span className="relative flex h-3 w-3">
             <span className={cn('absolute inline-flex h-full w-full rounded-full opacity-60', workersOk ? 'animate-ping bg-emerald-400' : 'bg-amber-400')} />
             <span className={cn('relative inline-flex h-3 w-3 rounded-full', workersOk ? 'bg-emerald-500' : 'bg-amber-500')} />
           </span>
@@ -128,106 +129,24 @@ export default function Notifications() {
           </div>
         </div>
         {stats.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => { setTab('activity'); setStatus(status === s.id ? '' : s.id); setPage(1) }}
-            className={cn('rounded-xl border bg-white p-4 text-left transition-shadow hover:shadow-sm', status === s.id && 'ring-2 ring-primary/30')}
-          >
+          <button key={s.id} onClick={() => { setSection('activity'); deliveries.setTab(deliveries.tab === s.id ? 'all' : s.id) }}
+            className={cn('press rounded-xl border bg-white p-4 text-left transition-shadow hover:shadow-sm', section === 'activity' && deliveries.tab === s.id && 'ring-2 ring-primary/30')}>
             <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500"><s.icon className={cn('h-3.5 w-3.5', s.tone)} />{s.label}</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{s.value}</p>
           </button>
         ))}
       </div>
       {(health?.attention || []).map((m) => (
-        <p key={m} className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{m}</p>
+        <p key={m} className="flex shrink-0 items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{m}</p>
       ))}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b">
-        {([['activity', 'Activity'], ['recipients', `Recipients (${recipients.length})`], ['bots', `Bots (${bots.length})`]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium', tab === id ? 'border-primary text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800')}>{label}</button>
-        ))}
-        <div className="ml-auto pb-1.5">
-          {tab === 'recipients' && canManageRecipients && <Button size="sm" onClick={() => setRecipientForm('new')}><Plus className="mr-1 h-3.5 w-3.5" />Add recipient</Button>}
-          {tab === 'bots' && canManageBots && <Button size="sm" onClick={() => setBotForm('new')}><Plus className="mr-1 h-3.5 w-3.5" />Add bot</Button>}
-        </div>
-      </div>
+      <TableTabs value={section} onChange={(id) => setSection(id as Section)} tabs={[
+        { id: 'activity', label: 'Deliveries' }, { id: 'recipients', label: 'Recipients', count: recipients.length }, { id: 'bots', label: 'Bots', count: bots.length },
+      ]} />
 
-      {tab === 'activity' && (
-        <section className="rounded-xl border bg-white">
-          <div className="flex flex-wrap gap-1.5 border-b px-4 py-3">
-            {([['', 'All'], ['sent', 'Delivered'], ['failed', 'Failed'], ['pending', 'Queued']] as const).map(([id, label]) => (
-              <button key={id} onClick={() => { setStatus(id); setPage(1) }} className={cn('rounded-full border px-3 py-1 text-sm', status === id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}>{label}</button>
-            ))}
-          </div>
-          {isLoading ? (
-            <div className="space-y-3 p-4">{[0, 1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />)}</div>
-          ) : !groups.length ? (
-            <div className="px-4 py-16 text-center">
-              <BellRing className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-              <p className="font-medium text-gray-700">No alerts {status ? 'with this status' : 'yet'}</p>
-              <p className="mt-1 text-sm text-gray-400">Alerts appear here when a record with auto-renew off gets close to its expiry date.</p>
-            </div>
-          ) : (
-            <div>
-              {groups.map((g) => (
-                <div key={g.day}>
-                  <p className="sticky top-0 bg-gray-50/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 backdrop-blur">{g.day}</p>
-                  <ul className="divide-y divide-gray-100">
-                    {g.items.map((log) => {
-                      const meta = STATUS_META[log.status] || STATUS_META.pending
-                      return (
-                        <li key={log.id} className="flex items-start gap-3 px-4 py-3">
-                          <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full', meta.tone)}><meta.icon className="h-4 w-4" /></span>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm">
-                              {log.record_type_slug
-                                ? <Link to={`/records/${log.record_type_slug}/${log.record_id}`} className="font-medium hover:underline">{log.record_name || 'Deleted record'}</Link>
-                                : <span className="font-medium">{log.record_name || 'Deleted record'}</span>}
-                              <span className="text-gray-500"> · {log.days_before === 0 ? 'expires today' : log.days_before != null ? `${log.days_before} day${log.days_before === 1 ? '' : 's'} before expiry` : log.rule_name}</span>
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {meta.label} to {log.recipient_name || 'removed recipient'}
-                              {log.record_type_name && ` · ${log.record_type_name}`}
-                              {log.retry_count > 0 && ` · ${log.retry_count} retr${log.retry_count === 1 ? 'y' : 'ies'}`}
-                            </p>
-                            {log.error_message && <p className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-700">{log.error_message}</p>}
-                          </div>
-                          <time className="shrink-0 text-xs text-gray-400" title={new Date(log.sent_at || log.scheduled_date).toLocaleString()}>
-                            {new Date(log.sent_at || log.scheduled_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </time>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              ))}
-              <div className="border-t px-4 py-2">
-                <TablePager shown={logs?.items?.length || 0} total={logs?.total || 0} noun="alerts" page={page} pages={logs?.total_pages || 1} onPage={setPage} />
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {tab === 'recipients' && (
-        <Recipients recipients={recipients} canManage={canManageRecipients} onEdit={(r) => setRecipientForm(r)} />
-      )}
-
-      {tab === 'bots' && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {bots.map((b) => (
-            <BotCard key={b.id} bot={b} canEdit={canEditBots} canDelete={canDeleteBots} onEdit={() => setBotForm(b)} />
-          ))}
-          {!bots.length && (
-            <div className="col-span-full rounded-xl border border-dashed bg-white px-4 py-12 text-center">
-              <Bot className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-              <p className="font-medium text-gray-700">No bots yet</p>
-              <p className="mt-1 text-sm text-gray-400">Create a bot with <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-primary hover:underline">@BotFather</a>, then add its token here.</p>
-            </div>
-          )}
-        </div>
-      )}
+      {section === 'activity' && <Deliveries t={deliveries} recipients={recipients} />}
+      {section === 'recipients' && <Recipients recipients={recipients} bots={bots} canManage={canManageRecipients} onEdit={(r) => setRecipientForm(r)} />}
+      {section === 'bots' && <Bots bots={bots} recipients={recipients} canEdit={canEditBots} canDelete={canDeleteBots} onEdit={(b) => setBotForm(b)} />}
 
       {recipientForm && <RecipientDialog recipient={recipientForm === 'new' ? null : recipientForm} bots={bots} onClose={() => setRecipientForm(null)} />}
       {botForm && <BotDialog bot={botForm === 'new' ? null : botForm} onClose={() => setBotForm(null)} />}
@@ -235,13 +154,69 @@ export default function Notifications() {
   )
 }
 
-function Recipients({ recipients, canManage, onEdit }: { recipients: NotificationRecipient[]; canManage: boolean; onEdit: (r: NotificationRecipient) => void }) {
+const DELIVERY_SORTS: SortDef[] = [
+  { id: 'scheduled_date', label: 'Date', kind: 'date' }, { id: 'record', label: 'Record' }, { id: 'recipient', label: 'Recipient' },
+  { id: 'status', label: 'Status' }, { id: 'retry_count', label: 'Retries', kind: 'number' },
+]
+
+function Deliveries({ t, recipients }: { t: TableState; recipients: NotificationRecipient[] }) {
+  const { data: types = [] } = useQuery<RecordType[]>({ queryKey: ['record-types'], queryFn: async () => (await api.get('/record-types')).data })
+  const f = t.filters
+  const day = range(f.when)
+  const tabStatus = STATUS_TABS[t.tab]
+  const params = {
+    page: t.page, page_size: t.pageSize, sort: t.sort, order: t.order, q: t.search || undefined,
+    status: tabStatus ?? csv(f.status), record_type_ids: csv(f.record_type), recipient_ids: csv(f.recipient), date_from: day.from, date_to: day.to,
+  }
+  const { data, isLoading, isFetching, error } = useQuery<{ items: ReminderLog[]; total: number; total_pages: number }>({
+    queryKey: ['reminder-logs', params],
+    queryFn: async () => (await api.get('/reminders/logs', { params })).data,
+    placeholderData: (prev) => prev,
+  })
+  const fields = useMemo(() => [
+    filterField('status', 'Status', 'select', STATUS_CHOICES),
+    filterField('record_type', 'Record type', 'select', types.map((x) => ({ value: String(x.id), label: x.name }))),
+    filterField('recipient', 'Recipient', 'select', recipients.map((r) => ({ value: String(r.id), label: r.display_name }))),
+    filterField('when', 'Date', 'date'),
+  ], [types, recipients])
+  const columns: Column<ReminderLog>[] = [
+    { id: 'record', label: 'Record', sort: 'record', locked: true, render: (l) => (
+      <TitleCell title={l.record_type_slug
+        ? <Link to={`/records/${l.record_type_slug}/${l.record_id}`} className="hover:text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{l.record_name || 'Deleted record'}</Link>
+        : (l.record_name || 'Deleted record')} sub={l.record_type_name ?? undefined} />) },
+    { id: 'status', label: 'Status', sort: 'status', render: (l) => <StatusPill status={l.status} /> },
+    { id: 'timing', label: 'Alert', render: (l) => l.days_before === 0 ? 'Expires today' : l.days_before != null ? `${l.days_before} day${l.days_before === 1 ? '' : 's'} before` : (l.rule_name || dash) },
+    { id: 'recipient', label: 'Recipient', sort: 'recipient', render: (l) => l.recipient_name || <span className="text-gray-400">Removed recipient</span> },
+    { id: 'when', label: 'Date', sort: 'scheduled_date', render: (l) => <span className="tabular-nums" title={new Date(when(l)).toLocaleString()}>{fmtWhen(when(l))}</span> },
+    { id: 'record_type', label: 'Record type', render: (l) => l.record_type_name || dash },
+    { id: 'retries', label: 'Retries', sort: 'retry_count', align: 'right', render: (l) => l.retry_count || dash },
+    { id: 'error', label: 'Error', nowrap: false, className: 'max-w-[24rem]', render: (l) => l.error_message ? <span className="line-clamp-2 text-xs text-red-700" title={l.error_message}>{l.error_message}</span> : dash },
+  ]
+  const filtered = !!t.search || Object.keys(t.filters).length > 0 || t.tab !== 'all'
+  return (
+    <>
+      <TableToolbar state={t} searchPlaceholder="Record, recipient, error…" filterFields={fields} sorts={DELIVERY_SORTS} columns={columns}>
+        {t.tab !== 'all' && <Button variant="ghost" size="sm" className="text-gray-500" onClick={() => t.setTab('all')}>Showing {t.tab === 'sent' ? 'delivered' : t.tab === 'pending' ? 'queued' : 'failed'} only. Show all</Button>}
+      </TableToolbar>
+      <DataTable rows={data?.items ?? []} rowKey={(l) => l.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        loading={isLoading && !data} fetching={isFetching} error={error ? apiError(error, 'Could not load deliveries') : null}
+        empty={<EmptyRows icon={<BellRing className="h-9 w-9" />} title={filtered ? 'No alerts match' : 'No alerts yet'}
+          hint={filtered ? 'Try another status or clear the filters.' : 'Alerts appear here when a record with auto-renew off gets close to its expiry date.'} />}
+        pager={{ page: t.page, pages: data?.total_pages || 1, total: data?.total || 0, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'alerts' }} />
+    </>
+  )
+}
+
+const RECIPIENT_SORTS: SortDef[] = [{ id: 'display_name', label: 'Name' }, { id: 'user_name', label: 'User' }, { id: 'status', label: 'Status' }]
+const ACTIVE_CHOICES = [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }]
+
+function Recipients({ recipients, bots, canManage, onEdit }: { recipients: NotificationRecipient[]; bots: TelegramBot[]; canManage: boolean; onEdit: (r: NotificationRecipient) => void }) {
   const qc = useQueryClient()
-  const [result, setResult] = useState<Record<number, { ok: boolean; msg: string }>>({})
+  const t = useTableState({ key: 'recipients', defaultSort: 'display_name', defaultColumns: ['telegram', 'user', 'bots', 'status'] })
   const test = useMutation({
     mutationFn: async (id: number) => (await api.post(`/reminders/recipients/${id}/test`)).data,
-    onSuccess: (data: any, id) => setResult((r) => ({ ...r, [id]: { ok: !!data.success, msg: data.success ? 'Test message delivered' : data.error || 'Test failed' } })),
-    onError: (err, id) => setResult((r) => ({ ...r, [id]: { ok: false, msg: apiError(err, 'Test failed') } })),
+    onSuccess: (data: any) => (data.success ? toast.success('Test message delivered') : toast.error(data.error || 'Test failed')),
+    onError: (err) => toast.error(apiError(err, 'Test failed')),
   })
   const remove = useMutation({
     mutationFn: async (id: number) => api.delete(`/reminders/recipients/${id}`),
@@ -253,69 +228,90 @@ function Recipients({ recipients, canManage, onEdit }: { recipients: Notificatio
     onSuccess: () => qc.invalidateQueries({ queryKey: ['recipients'] }),
     onError: (err) => toast.error(apiError(err, 'Could not update recipient')),
   })
-
-  if (!recipients.length) {
-    return (
-      <div className="rounded-xl border border-dashed bg-white px-4 py-12 text-center">
-        <Send className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-        <p className="font-medium text-gray-700">Nobody receives alerts yet</p>
-        <p className="mt-1 text-sm text-gray-400">Message your bot in Telegram, get your chat ID from <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-primary hover:underline">@userinfobot</a>, then add yourself.</p>
-      </div>
-    )
-  }
+  const fields = useMemo(() => [
+    filterField('status', 'Status', 'select', ACTIVE_CHOICES),
+    filterField('bot', 'Bot', 'select', bots.map((b) => ({ value: String(b.id), label: b.name }))),
+    filterField('linked_user', 'Linked to a user', 'boolean'),
+  ], [bots])
+  const get = (r: NotificationRecipient, slug: string): unknown => ({
+    display_name: r.display_name, user_name: r.user_name, status: r.active ? 'active' : 'paused', bot: r.telegram_bot_ids.map(String), linked_user: !!r.user_id,
+  } as Record<string, unknown>)[slug]
+  const view = clientRows(recipients, t, fields, get, (r) => [r.display_name, r.telegram_username, r.telegram_chat_id, r.user_name, ...(r.telegram_bot_names || [])].join(' '))
+  const columns: Column<NotificationRecipient>[] = [
+    { id: 'name', label: 'Name', sort: 'display_name', locked: true, render: (r) => (
+      <div className="flex items-center gap-2.5"><Avatar name={r.display_name} size="sm" /><TitleCell title={r.display_name} /></div>) },
+    { id: 'telegram', label: 'Telegram', render: (r) => <span className="text-gray-600">{r.telegram_username ? `@${r.telegram_username}` : `Chat ${r.telegram_chat_id}`}</span> },
+    { id: 'chat_id', label: 'Chat ID', render: (r) => <span className="font-mono text-xs">{r.telegram_chat_id}</span> },
+    { id: 'user', label: 'User', sort: 'user_name', render: (r) => r.user_name || dash },
+    { id: 'bots', label: 'Bots', render: (r) => (r.telegram_bot_names || []).length
+      ? <div className="flex gap-1">{r.telegram_bot_names.map((n) => <span key={n} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"><Bot className="h-3 w-3" />{n}</span>)}</div> : dash },
+    { id: 'status', label: 'Status', sort: 'status', render: (r) => <ActivePill active={r.active} /> },
+  ]
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {recipients.map((r) => (
-        <div key={r.id} className={cn('rounded-xl border bg-white p-4', !r.active && 'opacity-60')}>
-          <div className="flex items-start gap-3">
-            <Avatar name={r.display_name} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{r.display_name}</p>
-              <p className="truncate text-xs text-gray-500">{r.telegram_username ? `@${r.telegram_username}` : `Chat ${r.telegram_chat_id}`}{r.user_name ? ` · ${r.user_name}` : ''}</p>
-            </div>
-            {canManage && (
-              <RowMenu items={[
-                { label: 'Edit', icon: <Pencil />, onSelect: () => onEdit(r) },
-                { label: r.active ? 'Pause alerts' : 'Resume alerts', icon: <BellRing />, onSelect: () => toggle.mutate(r) },
-                { label: 'Remove', icon: <Trash2 />, danger: true, divider: true, onSelect: () => { if (confirm(`Remove ${r.display_name}?`)) remove.mutate(r.id) } },
-              ]} />
-            )}
+    <>
+      <TableToolbar state={t} searchPlaceholder="Name, username, user, bot…" filterFields={fields} sorts={RECIPIENT_SORTS} columns={columns} />
+      <DataTable rows={view.rows} rowKey={(r) => r.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        onRowClick={canManage ? onEdit : undefined} rowClassName={(r) => !r.active && 'opacity-60'}
+        actions={canManage ? (r) => (
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="outline" size="sm" className="h-7" disabled={test.isPending && test.variables === r.id} onClick={() => test.mutate(r.id)}>
+              <Send className="h-3 w-3 sm:mr-1" /><span className="hidden sm:inline">{test.isPending && test.variables === r.id ? 'Sending…' : 'Send test'}</span>
+            </Button>
+            <RowMenu items={[
+              { label: 'Edit', icon: <Pencil />, onSelect: () => onEdit(r) },
+              { label: r.active ? 'Pause alerts' : 'Resume alerts', icon: <BellRing />, onSelect: () => toggle.mutate(r) },
+              { label: 'Remove', icon: <Trash2 />, danger: true, divider: true, onSelect: () => { if (confirm(`Remove ${r.display_name}?`)) remove.mutate(r.id) } },
+            ]} />
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {(r.telegram_bot_names || []).map((n) => <span key={n} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"><Bot className="h-3 w-3" />{n}</span>)}
-            {!r.active && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">Paused</span>}
-            {canManage && (
-              <Button variant="outline" size="sm" className="ml-auto h-7" disabled={test.isPending && test.variables === r.id} onClick={() => test.mutate(r.id)}>
-                <Send className="mr-1 h-3 w-3" />{test.isPending && test.variables === r.id ? 'Sending…' : 'Send test'}
-              </Button>
-            )}
-          </div>
-          {result[r.id] && <p className={cn('mt-2 rounded px-2 py-1 text-xs', result[r.id].ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>{result[r.id].msg}</p>}
-        </div>
-      ))}
-    </div>
+        ) : undefined}
+        empty={recipients.length ? <EmptyRows icon={<Send className="h-9 w-9" />} title="No recipients match" /> : (
+          <EmptyRows icon={<Send className="h-9 w-9" />} title="Nobody receives alerts yet"
+            hint={<>Message your bot in Telegram, get your chat ID from <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer" className="text-primary hover:underline">@userinfobot</a>, then add yourself.</>} />
+        )}
+        pager={{ page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'recipients' }} />
+    </>
   )
 }
 
-function BotCard({ bot, canEdit, canDelete, onEdit }: { bot: TelegramBot; canEdit: boolean; canDelete: boolean; onEdit: () => void }) {
+const BOT_SORTS: SortDef[] = [{ id: 'name', label: 'Name' }, { id: 'status', label: 'Status' }, { id: 'recipients', label: 'Recipients', kind: 'number' }, { id: 'created_at', label: 'Added', kind: 'date' }]
+
+function Bots({ bots, recipients, canEdit, canDelete, onEdit }: { bots: TelegramBot[]; recipients: NotificationRecipient[]; canEdit: boolean; canDelete: boolean; onEdit: (b: TelegramBot) => void }) {
   const qc = useQueryClient()
+  const t = useTableState({ key: 'bots', defaultSort: 'name', defaultColumns: ['token', 'recipients', 'status'] })
   const remove = useMutation({
-    mutationFn: async () => api.delete(`/reminders/bots/${bot.id}`),
+    mutationFn: async (id: number) => api.delete(`/reminders/bots/${id}`),
     onSuccess: () => { ['telegram-bots', 'recipients', 'record-types'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); toast.success('Bot removed') },
     onError: (err) => toast.error(apiError(err, 'Could not remove bot')),
   })
+  const users = (b: TelegramBot) => recipients.filter((r) => r.telegram_bot_ids.includes(b.id)).length
+  const fields = useMemo(() => [filterField('status', 'Status', 'select', [{ value: 'active', label: 'Active' }, { value: 'off', label: 'Off' }])], [])
+  const get = (b: TelegramBot, slug: string): unknown => ({ name: b.name, status: b.active ? 'active' : 'off', recipients: users(b), created_at: b.created_at } as Record<string, unknown>)[slug]
+  const view = clientRows(bots, t, fields, get, (b) => b.name)
+  const columns: Column<TelegramBot>[] = [
+    { id: 'name', label: 'Name', sort: 'name', locked: true, render: (b) => (
+      <div className="flex items-center gap-2.5"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600"><Bot className="h-4 w-4" /></span><TitleCell title={b.name} /></div>) },
+    { id: 'token', label: 'Token', render: (b) => <span className="font-mono text-xs text-gray-500">{b.bot_token ? `••••${b.bot_token.slice(-4)}` : 'No token'}</span> },
+    { id: 'recipients', label: 'Recipients', sort: 'recipients', align: 'right', render: (b) => users(b) },
+    { id: 'status', label: 'Status', sort: 'status', render: (b) => <ActivePill active={b.active} off="Off" /> },
+    { id: 'created_at', label: 'Added', sort: 'created_at', render: (b) => <span className="tabular-nums">{new Date(b.created_at).toLocaleDateString()}</span> },
+  ]
   return (
-    <div className={cn('flex items-center gap-3 rounded-xl border bg-white p-4', !bot.active && 'opacity-60')}>
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-600"><Bot className="h-5 w-5" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{bot.name}</p>
-        <p className="font-mono text-xs text-gray-500">{bot.bot_token ? `••••${bot.bot_token.slice(-4)}` : 'No token'} · {bot.active ? 'Active' : 'Off'}</p>
-      </div>
-      <RowMenu items={[
-        { label: 'Edit', icon: <Pencil />, hidden: !canEdit, onSelect: onEdit },
-        { label: 'Remove', icon: <Trash2 />, danger: true, hidden: !canDelete, onSelect: () => { if (confirm(`Remove bot "${bot.name}"? Recipients and record types using it will need another bot.`)) remove.mutate() } },
-      ]} />
-    </div>
+    <>
+      <TableToolbar state={t} searchPlaceholder="Bot name…" filterFields={fields} sorts={BOT_SORTS} columns={columns} />
+      <DataTable rows={view.rows} rowKey={(b) => b.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        onRowClick={canEdit ? onEdit : undefined} rowClassName={(b) => !b.active && 'opacity-60'}
+        actions={canEdit || canDelete ? (b) => (
+          <RowMenu items={[
+            { label: 'Edit', icon: <Pencil />, hidden: !canEdit, onSelect: () => onEdit(b) },
+            { label: 'Remove', icon: <Trash2 />, danger: true, hidden: !canDelete, onSelect: () => { if (confirm(`Remove bot "${b.name}"? Recipients and record types using it will need another bot.`)) remove.mutate(b.id) } },
+          ]} />
+        ) : undefined}
+        empty={bots.length ? <EmptyRows icon={<Bot className="h-9 w-9" />} title="No bots match" /> : (
+          <EmptyRows icon={<Bot className="h-9 w-9" />} title="No bots yet"
+            hint={<>Create a bot with <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-primary hover:underline">@BotFather</a>, then add its token here.</>} />
+        )}
+        pager={{ page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'bots' }} />
+    </>
   )
 }
 

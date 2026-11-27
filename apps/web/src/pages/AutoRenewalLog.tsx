@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { RefreshCcw } from 'lucide-react'
 import api from '@/lib/api'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { TableCard, TableScrollArea, TH_STICKY, TablePager } from '../components/table_shell'
+import { errorMessage } from '@workspace/core'
+import {
+  DataTable, EmptyRows, TableToolbar, TitleCell, clientRows, filterField, useTableState,
+  type Column, type SortDef,
+} from '@/components/data-table'
 import { useAuthStore } from '../store/auth'
 
 interface RenewalEntry {
@@ -20,78 +23,78 @@ interface RenewalEntry {
   new_date: string
 }
 
+/* The endpoint pages and searches only, so the log loads whole (up to MAX rows)
+   and is filtered, sorted and paged in the browser. */
+const MAX_PAGES = 20
+const NONE: RenewalEntry[] = []
+async function fetchAll(): Promise<RenewalEntry[]> {
+  const out: RenewalEntry[] = []
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const data = (await api.get('/records/auto-renewals', { params: { page, page_size: 100 } })).data
+    out.push(...(data.items ?? []))
+    if (page >= (data.total_pages ?? 1)) break
+  }
+  return out
+}
+
 const calendarDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' })
-const formatDate = (value: string | null) => value ? calendarDate.format(new Date(value)) : '—'
-const columns = ['Logged at', 'Record', 'Record type', 'Previous expiry', 'New expiry']
+const formatDate = (value: string | null) => (value ? calendarDate.format(new Date(value)) : '-')
+const early = (e: RenewalEntry) => !!(e.renewed_on && e.old_date && e.renewed_on < e.old_date)
+
+const COLUMNS: Column<RenewalEntry>[] = [
+  { id: 'record', label: 'Record', sort: 'record', locked: true, render: (e) => (
+    <TitleCell title={e.can_open
+      ? <Link className="text-primary hover:underline" onClick={(ev) => ev.stopPropagation()} to={`/records/${encodeURIComponent(e.record_type_slug)}/${e.record_id}`}>{e.record_name}</Link>
+      : e.record_name} sub={e.record_type} />) },
+  { id: 'record_type', label: 'Record type', sort: 'record_type', render: (e) => e.record_type },
+  { id: 'old_date', label: 'Previous expiry', sort: 'old_date', render: (e) => <span className="tabular-nums">{formatDate(e.old_date)}</span> },
+  { id: 'new_date', label: 'New expiry', sort: 'new_date', render: (e) => (
+    <span className="tabular-nums"><span className="font-medium">{formatDate(e.new_date)}</span>
+      {early(e) && <span className="block text-xs text-gray-500">Recorded early. Effective {formatDate(e.old_date)}.</span>}</span>) },
+  { id: 'renewed_on', label: 'Renewed on', sort: 'renewed_on', render: (e) => <span className="tabular-nums">{formatDate(e.renewed_on)}</span> },
+  { id: 'created_at', label: 'Logged at', sort: 'created_at', render: (e) => <span className="tabular-nums text-gray-500">{new Date(e.created_at).toLocaleString()}</span> },
+]
+const SORTS: SortDef[] = [
+  { id: 'created_at', label: 'Logged at', kind: 'date' }, { id: 'record', label: 'Record' }, { id: 'record_type', label: 'Record type' },
+  { id: 'old_date', label: 'Previous expiry', kind: 'date' }, { id: 'new_date', label: 'New expiry', kind: 'date' }, { id: 'renewed_on', label: 'Renewed on', kind: 'date' },
+]
+const get = (e: RenewalEntry, slug: string): unknown => {
+  switch (slug) {
+    case 'record': return e.record_name
+    case 'record_type': return e.record_type
+    case 'early': return early(e)
+    default: return (e as unknown as Record<string, unknown>)[slug]
+  }
+}
 
 export default function AutoRenewalLog() {
-  const userId = useAuthStore(s => s.user?.id)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [draft, setDraft] = useState('')
-  const { data, isLoading, isError, refetch } = useQuery<{
-    items: RenewalEntry[]
-    total: number
-    total_pages: number
-  }>({
-    queryKey: ['automatic-renewals', userId, page, search],
-    queryFn: async () => (await api.get('/records/auto-renewals', { params: { page, search } })).data,
-  })
+  const userId = useAuthStore((s) => s.user?.id)
+  const t = useTableState({ key: 'autorenew', defaultSort: 'created_at', defaultOrder: 'desc', defaultColumns: ['record_type', 'old_date', 'new_date', 'created_at'] })
+  const { data, isLoading, isFetching, error } = useQuery({ queryKey: ['automatic-renewals', userId, 'all'], queryFn: fetchAll })
+  const all = data ?? NONE
+  const fields = useMemo(() => [
+    filterField('record_type', 'Record type', 'select', [...new Set(all.map((e) => e.record_type))].sort()),
+    filterField('created_at', 'Logged', 'date'),
+    filterField('old_date', 'Previous expiry', 'date'),
+    filterField('new_date', 'New expiry', 'date'),
+    filterField('early', 'Recorded early', 'boolean'),
+  ], [all])
+  const view = clientRows(all, t, fields, get, (e) => `${e.record_name} ${e.record_type}`)
+  const filtered = !!t.search || Object.keys(t.filters).length > 0
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <header className="shrink-0">
-        <h2 className="text-lg font-semibold">Auto-renewal Log</h2>
-        <p className="text-sm text-gray-500 mt-1">Review automatic renewals across your record types, newest first.</p>
+        <h2 className="text-lg font-semibold">Auto-renewal log</h2>
+        <p className="mt-1 text-sm text-gray-500">Automatic renewals across the record types you can see.</p>
       </header>
-      <TableCard
-        className="flex-1 min-h-0"
-        header={
-          <form className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b"
-            onSubmit={e => { e.preventDefault(); setSearch(draft.trim()); setPage(1) }}>
-            <Input type="search" aria-label="Search by record name or type" placeholder="Search record or type"
-              value={draft} onChange={e => setDraft(e.target.value)} maxLength={200} className="w-56 sm:w-72" />
-            <Button variant="outline" size="sm" type="submit">Search</Button>
-            {search && <Button variant="ghost" size="sm" type="button"
-              onClick={() => { setDraft(''); setSearch(''); setPage(1) }}>Clear</Button>}
-          </form>
-        }
-        footer={<TablePager shown={data?.items.length ?? 0} total={data?.total ?? 0} noun="renewals" page={page} pages={data?.total_pages ?? page} onPage={setPage} />}
-      >
-        <TableScrollArea className="flex-1">
-          <table className="w-full text-sm">
-            <thead className="border-b text-left text-xs text-gray-500">
-              <tr>{columns.map(column => <th key={column} scope="col" className={`px-3 py-2 whitespace-nowrap ${TH_STICKY}`}>{column}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y">
-              {isLoading && <tr><td colSpan={columns.length} className="p-8 text-center text-gray-500">Loading renewals…</td></tr>}
-              {isError && <tr><td colSpan={columns.length} className="p-8 text-center">
-                <p role="alert" className="text-red-700">Could not load the auto-renewal log.</p>
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>Retry</Button>
-              </td></tr>}
-              {data?.items.length === 0 && <tr><td colSpan={columns.length} className="p-8 text-center text-gray-500">
-                {search ? 'No automatic renewals match your search.' : 'No automatic renewals have been logged yet.'}
-              </td></tr>}
-              {data?.items.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50 align-top">
-                  <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{new Date(entry.created_at).toLocaleString()}</td>
-                  <td className="px-3 py-2.5 font-medium">
-                    {entry.can_open ? <Link className="text-primary hover:underline"
-                      to={`/records/${encodeURIComponent(entry.record_type_slug)}/${entry.record_id}`}>{entry.record_name}</Link> : entry.record_name}
-                  </td>
-                  <td className="px-3 py-2.5">{entry.record_type}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{formatDate(entry.old_date)}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <span className="font-medium">{formatDate(entry.new_date)}</span>
-                    {entry.renewed_on && entry.old_date && entry.renewed_on < entry.old_date &&
-                      <span className="block text-xs text-gray-500">Recorded early. Effective {formatDate(entry.old_date)}.</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableScrollArea>
-      </TableCard>
+
+      <TableToolbar state={t} searchPlaceholder="Record or type…" filterFields={fields} sorts={SORTS} columns={COLUMNS} />
+
+      <DataTable rows={view.rows} rowKey={(e) => e.id} columns={COLUMNS} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+        loading={isLoading} fetching={isFetching && !isLoading} error={error ? `Could not load the auto-renewal log. ${errorMessage(error)}` : null}
+        empty={<EmptyRows icon={<RefreshCcw className="h-9 w-9" />} title={filtered ? 'No renewals match' : 'No automatic renewals yet'} hint={filtered ? 'Try clearing the filters.' : undefined} />}
+        pager={{ page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'renewals' }} />
     </div>
   )
 }

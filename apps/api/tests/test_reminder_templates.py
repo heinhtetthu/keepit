@@ -33,7 +33,7 @@ async def test_template_tokens_escape_values_defaults_and_missing_fields():
     assert "field_10" in default and "field_11" not in default
     assert "PRIVATE-KEY" not in messages.render(default, values)["text"]
     record.values = []
-    assert messages.context(rt, record, "2028-01-31", 7, date(2028, 1, 24))["field_10"] == "—"
+    assert messages.context(rt, record, "2028-01-31", 7, date(2028, 1, 24))["field_10"] == "-"
 
 
 @pytest.mark.parametrize("template", [

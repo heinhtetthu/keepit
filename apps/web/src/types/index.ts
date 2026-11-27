@@ -194,6 +194,8 @@ export interface Employee {
   email: string | null
   business_units: string[]
   title: string | null
+  department?: string | null
+  country?: string | null
   active: boolean
   phone?: string | null
   join_date?: string | null

@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { ScrollText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '../store/auth'
 
 const sections = [
-  { to: '/audit-logs', label: 'Audit Logs', systemAdminOnly: true },
-  { to: '/audit-logs/auto-renewals', label: 'Auto-renewal Log' },
+  { to: '/audit-logs', label: 'Audit logs', systemAdminOnly: true },
+  { to: '/audit-logs/auto-renewals', label: 'Auto-renewal log' },
   { to: '/audit-logs/trash', label: 'Trash' },
 ]
 
@@ -13,12 +14,18 @@ export default function ActivityLayout() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <h1 className="shrink-0 text-2xl font-semibold tracking-tight text-gray-900">Activity</h1>
-      <nav aria-label="Activity sections" className="flex shrink-0 flex-wrap gap-x-2 border-b border-gray-200">
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-white"><ScrollText className="h-5 w-5 text-gray-600" /></div>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">Activity</h1>
+          <p className="truncate text-sm text-gray-500">The audit trail, automatic renewals and deleted records.</p>
+        </div>
+      </div>
+      <nav aria-label="Activity sections" className="flex shrink-0 gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1 sm:self-start">
         {sections.filter(section => !section.systemAdminOnly || isSystemAdmin).map(section => (
           <NavLink key={section.to} to={section.to} end className={({ isActive }) => cn(
-            'whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium',
-            isActive ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-900',
+            'press whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+            isActive ? 'bg-white text-gray-900 shadow-soft' : 'text-gray-500 hover:text-gray-900',
           )}>
             {section.label}
           </NavLink>

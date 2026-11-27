@@ -1,12 +1,12 @@
 /** Formatting helpers with no DOM dependency. */
 export function formatDate(value?: string | null): string {
-  if (!value) return '—'
+  if (!value) return '-'
   const d = new Date(value.length === 10 ? `${value}T00:00:00` : value)
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export function formatMoney(amount?: string | number | null, currency?: string | null): string {
-  if (amount === null || amount === undefined || amount === '') return '—'
+  if (amount === null || amount === undefined || amount === '') return '-'
   const n = typeof amount === 'number' ? amount : Number(amount)
   if (Number.isNaN(n)) return String(amount)
   const s = n.toLocaleString(undefined, { maximumFractionDigits: 2 })

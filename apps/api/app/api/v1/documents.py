@@ -26,13 +26,29 @@ async def categories(user=Depends(require_permission("document.view"))):
 
 
 @router.get("", response_model=DocumentListResponse)
-async def list_documents(q: str | None = Query(None, max_length=200), category: str | None = None,
+async def list_documents(q: str | None = Query(None, max_length=200),
+                         category: str | None = Query(None, description="Comma list of categories"),
                          entity_type: str | None = None, entity_id: int | None = None,
                          expiring_before: date | None = None, deleted: bool = False,
+                         linked: str | None = Query(None, description="Comma list: asset, employee, record, borrow, none"),
+                         expiry: str | None = Query(None, description="Comma list: expired, expiring, active, none"),
+                         expiry_from: date | None = None, expiry_to: date | None = None,
+                         uploaded_from: date | None = None, uploaded_to: date | None = None,
+                         file_type: str | None = Query(None, description="Comma list: pdf, image, text, office, other"),
+                         sort: str | None = Query(None, pattern="^(title|category|expiry_date|size_bytes|created_at|updated_at|file_name)$"),
+                         order: str = Query("desc", pattern="^(asc|desc)$"),
                          page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
                          db: AsyncSession = DB, user=Depends(require_permission("document.view"))):
     return await svc.list_documents(db, q=q, category=category, entity_type=entity_type, entity_id=entity_id,
-                                    expiring_before=expiring_before, deleted=deleted, page=page, page_size=page_size)
+                                    expiring_before=expiring_before, deleted=deleted, page=page, page_size=page_size,
+                                    linked=linked, expiry=expiry, expiry_from=expiry_from, expiry_to=expiry_to,
+                                    uploaded_from=uploaded_from, uploaded_to=uploaded_to, file_type=file_type,
+                                    sort=sort, order=order)
+
+
+@router.get("/tab-counts")
+async def document_tab_counts(db: AsyncSession = DB, user=Depends(require_permission("document.view"))) -> dict[str, int]:
+    return await svc.tab_counts(db)
 
 
 @router.post("", response_model=DocumentResponse, status_code=201)

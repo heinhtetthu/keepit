@@ -83,7 +83,7 @@ function describe(field: RecordField | undefined, slug: string, v: any): string 
   if (kind === 'text') return `${field.name} contains "${v}"`
   const fmt = (x: string) => (kind === 'date' ? String(x).slice(0, 10) : x)
   if (v?.lt) return `${field.name} before ${fmt(v.lt)}`
-  if (v?.gte && v?.lte) return `${field.name} ${fmt(v.gte)} – ${fmt(v.lte)}`
+  if (v?.gte && v?.lte) return `${field.name} ${fmt(v.gte)} - ${fmt(v.lte)}`
   if (v?.gte) return `${field.name} ≥ ${fmt(v.gte)}`
   if (v?.lte) return `${field.name} ≤ ${fmt(v.lte)}`
   return field.name
@@ -320,7 +320,7 @@ function FieldSection({ field, value, onChange, simple }: { field: RecordField; 
         )}
         <div className="flex items-center gap-2">
           <Input type={kind === 'date' ? 'date' : 'number'} step="any" className="h-9" value={cur.gte ?? ''} onChange={(e) => bound('gte', e.target.value)} aria-label={`${field.name} from`} placeholder="Min" />
-          <span className="text-gray-400">–</span>
+          <span className="text-gray-400">-</span>
           <Input type={kind === 'date' ? 'date' : 'number'} step="any" className="h-9" value={cur.lte ?? ''} onChange={(e) => bound('lte', e.target.value)} aria-label={`${field.name} to`} placeholder="Max" />
         </div>
       </div>

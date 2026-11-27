@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -260,10 +260,44 @@ async def send_test_message(db: AsyncSession, recipient_id: int) -> dict:
     return {"success": not errors, "error": "; ".join(errors) if errors else None, "recipient": recipient.display_name}
 
 
-async def get_reminder_logs(db: AsyncSession, page: int = 1, page_size: int = 25, status: str | None = None, allowed_type_ids: list[int] | None = None):
+LOG_SORTS = ("scheduled_date", "sent_at", "status", "record", "recipient", "retry_count")
+
+
+def _log_order(sort: str | None, order: str):
+    when = func.coalesce(ReminderLog.sent_at, ReminderLog.scheduled_date)
+    cols = {
+        "scheduled_date": when, "sent_at": ReminderLog.sent_at, "status": ReminderLog.status, "retry_count": ReminderLog.retry_count,
+        "record": select(Record.name).where(Record.id == ReminderLog.record_id).scalar_subquery(),
+        "recipient": select(NotificationRecipient.display_name).where(NotificationRecipient.id == ReminderLog.recipient_id).scalar_subquery(),
+    }
+    if sort not in cols:
+        return [ReminderLog.id.desc()]
+    col = cols[sort]
+    return [col.asc().nulls_last() if order == "asc" else col.desc().nulls_last(), ReminderLog.id.desc()]
+
+
+async def get_reminder_logs(db: AsyncSession, page: int = 1, page_size: int = 25, status: str | None = None, allowed_type_ids: list[int] | None = None,
+                            *, q: str | None = None, record_type_ids: list[int] | None = None, recipient_ids: list[int] | None = None,
+                            date_from=None, date_to=None, sort: str | None = None, order: str = "desc"):
     conditions = []
-    if status:
-        conditions.append(ReminderLog.status == status)
+    statuses = [x.strip() for x in (status or "").split(",") if x.strip()]
+    if statuses:
+        conditions.append(ReminderLog.status.in_(statuses))
+    if q:
+        like = f"%{q.strip()}%"
+        conditions.append(or_(
+            ReminderLog.record_id.in_(select(Record.id).where(Record.name.ilike(like))),
+            ReminderLog.recipient_id.in_(select(NotificationRecipient.id).where(NotificationRecipient.display_name.ilike(like))),
+            ReminderLog.error_message.ilike(like),
+        ))
+    if record_type_ids:
+        conditions.append(ReminderLog.record_id.in_(select(Record.id).where(Record.record_type_id.in_(record_type_ids))))
+    if recipient_ids:
+        conditions.append(ReminderLog.recipient_id.in_(recipient_ids))
+    if date_from:
+        conditions.append(func.date(func.coalesce(ReminderLog.sent_at, ReminderLog.scheduled_date)) >= date_from)
+    if date_to:
+        conditions.append(func.date(func.coalesce(ReminderLog.sent_at, ReminderLog.scheduled_date)) <= date_to)
     if allowed_type_ids is not None:
         type_subquery = select(Record.id)
         if allowed_type_ids:
@@ -277,7 +311,7 @@ async def get_reminder_logs(db: AsyncSession, page: int = 1, page_size: int = 25
     query = (
         select(ReminderLog).where(*conditions)
         .options(selectinload(ReminderLog.record).selectinload(Record.record_type), selectinload(ReminderLog.rule), selectinload(ReminderLog.recipient))
-        .order_by(ReminderLog.id.desc())
+        .order_by(*_log_order(sort, order))
         .offset((page - 1) * page_size).limit(page_size)
     )
     items = (await db.execute(query)).scalars().all()
@@ -646,3 +680,107 @@ async def process_due_reminders(db: AsyncSession) -> dict:
     result.update(retry_result)
     result.update(auto_result)
     return result
+
+
+# ---------------- Upcoming renewals (Reminders page) ----------------
+
+UPCOMING_LIMIT = 1500
+OVERDUE_LIMIT = 500
+
+
+async def upcoming_renewals(db: AsyncSession, allowed: list[int] | None, days: int = 90) -> dict:
+    """Records whose renewal/expiry date is overdue or within `days`, with the
+    next reminder each one will get and whether auto-renew handles it.
+
+    Mirrors the worker: a record that will auto-renew gets no reminder, and a
+    rule fires on expiry minus days_before.
+    """
+    from sqlalchemy import and_
+    from app.models.record import RecordValue
+    from app.services.date_query import field_date
+    from app.services.record import (AUTO_RENEW_FIELD_NAMES, _find_field, _raw_values,
+                                     auto_renew_enabled, auto_renew_months, effective_lead)
+
+    today = await app_today(db)
+    end = today + timedelta(days=days)
+    types_query = select(RecordType).where(RecordType.active.is_(True), RecordType.reminder_field_id.is_not(None))
+    if allowed is not None:
+        types_query = types_query.where(RecordType.id.in_(allowed or [-1]))
+    types = (await db.execute(types_query.options(selectinload(RecordType.fields)))).scalars().all()
+    type_by_id = {rt.id: rt for rt in types}
+    empty_summary = {"overdue": 0, "week": 0, "month": 0, "window": 0, "auto_renew_on": 0, "auto_renew_off": 0, "no_reminder": 0}
+    if not types:
+        return {"today": today.isoformat(), "days": days, "truncated": False, "summary": empty_summary, "items": []}
+
+    dates = select(
+        Record.id.label("id"), Record.record_type_id.label("record_type_id"), field_date().label("expiry"),
+    ).join(RecordType, RecordType.id == Record.record_type_id).join(RecordValue, and_(
+        RecordValue.record_id == Record.id, RecordValue.field_id == RecordType.reminder_field_id,
+    )).where(
+        Record.archived == False, Record.deleted_at.is_(None),  # noqa: E712
+        Record.record_type_id.in_(list(type_by_id)),
+        RecordValue.field_id.in_([rt.reminder_field_id for rt in types]),
+    ).subquery()
+    expiry = dates.c.expiry
+    counts = (await db.execute(select(
+        func.count().filter(expiry < today).label("overdue"),
+        func.count().filter(and_(expiry >= today, expiry <= today + timedelta(days=7))).label("week"),
+        func.count().filter(and_(expiry >= today, expiry <= today + timedelta(days=30))).label("month"),
+        func.count().filter(and_(expiry >= today, expiry <= end)).label("window"),
+    ))).one()
+    soon = (await db.execute(select(dates.c.id, expiry).where(expiry >= today, expiry <= end)
+                             .order_by(expiry, dates.c.id).limit(UPCOMING_LIMIT))).all()
+    late = (await db.execute(select(dates.c.id, expiry).where(expiry < today)
+                             .order_by(expiry.desc(), dates.c.id).limit(OVERDUE_LIMIT))).all()
+    expiry_by_id = {r.id: r.expiry for r in [*soon, *late]}
+    truncated = len(soon) < counts.window or len(late) < counts.overdue
+
+    records = (await db.execute(select(Record).where(Record.id.in_(list(expiry_by_id) or [-1]))
+                                .options(selectinload(Record.values)))).scalars().all()
+    rules = (await db.execute(select(ReminderRule).where(
+        ReminderRule.active.is_(True), ReminderRule.record_type_id.in_(list(type_by_id)),
+    ))).scalars().all()
+    rules_by_type: dict[int, list[ReminderRule]] = {}
+    for rule in rules:
+        rules_by_type.setdefault(rule.record_type_id, []).append(rule)
+
+    items = []
+    summary = {**empty_summary, "overdue": counts.overdue, "week": counts.week, "month": counts.month, "window": counts.window}
+    for record in records:
+        rt = type_by_id[record.record_type_id]
+        exp = expiry_by_id[record.id]
+        remaining = (exp - today).days
+        fields = {f.id: f for f in rt.fields if f.active}
+        raw = _raw_values(record, fields)
+        auto_field = _find_field(AUTO_RENEW_FIELD_NAMES, rt)
+        auto = None if auto_field is None else auto_renew_enabled(raw.get(auto_field.slug))
+        will_auto = auto_field is not None and bool(auto_renew_months(rt, raw))
+        lead = effective_lead(record, rt)
+        cost_field, currency_field = _find_field({"Cost"}, rt), _find_field({"Currency"}, rt)
+        cycle_field = _find_field({"Billing Cycle", "Renewal Cycle"}, rt)
+        next_reminder = None
+        if not will_auto and remaining >= 0:
+            due = [r for r in rules_by_type.get(rt.id, []) if r.days_before <= remaining]
+            if due:
+                rule = max(due, key=lambda r: r.days_before)
+                next_reminder = {"rule_id": rule.id, "name": rule.name, "days_before": rule.days_before,
+                                 "date": (exp - timedelta(days=rule.days_before)).isoformat()}
+        if auto is True:
+            summary["auto_renew_on"] += 1
+        elif auto is False:
+            summary["auto_renew_off"] += 1
+        if next_reminder is None and not will_auto and remaining >= 0:
+            summary["no_reminder"] += 1
+        items.append({
+            "id": record.id, "name": record.name, "status": record.status,
+            "record_type_id": rt.id, "record_type_name": rt.name, "record_type_slug": rt.slug, "record_type_icon": rt.icon,
+            "expiry_date": exp.isoformat(), "days_remaining": remaining,
+            "auto_renew": auto, "will_auto_renew": will_auto,
+            "auto_renew_date": (exp - timedelta(days=lead)).isoformat() if will_auto else None,
+            "cost": raw.get(cost_field.slug) if cost_field else None,
+            "currency": raw.get(currency_field.slug) if currency_field else None,
+            "cycle": raw.get(cycle_field.slug) if cycle_field else None,
+            "next_reminder": next_reminder,
+        })
+    items.sort(key=lambda i: (i["expiry_date"], i["id"]))
+    return {"today": today.isoformat(), "days": days, "truncated": truncated, "summary": summary, "items": items}

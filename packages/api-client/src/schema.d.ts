@@ -172,7 +172,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Maintenance Log */
+        /**
+         * Maintenance Log
+         * @description Cross-asset maintenance log. issues=true keeps entries with any checklist item or body not OK.
+         */
         get: operations["maintenance_log_api_v1_assets_maintenance_get"];
         put?: never;
         post?: never;
@@ -189,7 +192,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Repair Log */
+        /**
+         * Repair Log
+         * @description Cross-asset repair log. status, vendor and asset_type take comma lists.
+         */
         get: operations["repair_log_api_v1_assets_repairs_get"];
         put?: never;
         post?: never;
@@ -499,6 +505,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-logs/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Filter Options
+         * @description Choices for the audit list filter panel: actions, areas and people that appear in the log.
+         */
+        get: operations["audit_filter_options_api_v1_audit_logs_filters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -648,7 +674,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Borrows */
+        /**
+         * List Borrows
+         * @description Borrow log. status, employee_ids and asset_type take comma lists; asset_type "__none__" means not an asset.
+         */
         get: operations["list_borrows_api_v1_borrows_get"];
         put?: never;
         /** Create Borrow */
@@ -673,7 +702,10 @@ export interface paths {
         delete: operations["delete_borrow_api_v1_borrows__borrow_id__delete"];
         options?: never;
         head?: never;
-        /** Update Borrow */
+        /**
+         * Update Borrow
+         * @description Correct any detail of an entry (system admins and itlog.manage). Audited with old and new values.
+         */
         patch: operations["update_borrow_api_v1_borrows__borrow_id__patch"];
         trace?: never;
     };
@@ -818,6 +850,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Departments
+         * @description Department master list, used by the employee form and filters.
+         */
+        get: operations["list_departments_api_v1_departments_get"];
+        put?: never;
+        /** Create Department */
+        post: operations["create_department_api_v1_departments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/departments/{dept_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Department
+         * @description Rename a department; employees holding the old name follow the rename.
+         */
+        put: operations["update_department_api_v1_departments__dept_id__put"];
+        post?: never;
+        /** Delete Department */
+        delete: operations["delete_department_api_v1_departments__dept_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents": {
         parameters: {
             query?: never;
@@ -845,6 +919,23 @@ export interface paths {
         };
         /** Categories */
         get: operations["categories_api_v1_documents_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/tab-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document Tab Counts */
+        get: operations["document_tab_counts_api_v1_documents_tab_counts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1206,6 +1297,57 @@ export interface paths {
         };
         /** Guide */
         get: operations["guide_api_v1_help_guide_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{entity}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Entity History */
+        get: operations["entity_history_api_v1_history__entity___entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{entity}/{entity_id}/revert/{audit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Version */
+        post: operations["restore_version_api_v1_history__entity___entity_id__revert__audit_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/history/{entity}/{entity_id}/revert/{audit_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Restore Preview */
+        get: operations["restore_preview_api_v1_history__entity___entity_id__revert__audit_id__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2121,6 +2263,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reminders/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upcoming Renewals
+         * @description Overdue and upcoming renewals with each record's next reminder, for the Reminders page.
+         */
+        get: operations["upcoming_renewals_api_v1_reminders_upcoming_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/allocation": {
         parameters: {
             query?: never;
@@ -2475,6 +2637,57 @@ export interface paths {
         /** Put Ai */
         put: operations["put_ai_api_v1_settings_ai_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/ai/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ai Models */
+        post: operations["ai_models_api_v1_settings_ai_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/ai/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai Providers */
+        get: operations["ai_providers_api_v1_settings_ai_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/ai/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ai Test */
+        post: operations["ai_test_api_v1_settings_ai_test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2857,6 +3070,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIProbe */
+        AIProbe: {
+            /**
+             * Api Key
+             * @description A just-pasted key; omit to use the saved key
+             */
+            api_key?: string | null;
+            /** Model */
+            model?: string | null;
+            /**
+             * Provider
+             * @description Defaults to the saved provider
+             */
+            provider?: string | null;
+        };
         /** AISettings */
         AISettings: {
             /**
@@ -2866,6 +3094,7 @@ export interface components {
             api_key?: string | null;
             /**
              * Base Url
+             * @description Only used by the custom provider
              * @default
              */
             base_url: string;
@@ -2874,6 +3103,11 @@ export interface components {
              * @default
              */
             model: string;
+            /**
+             * Provider
+             * @description Provider id from /settings/ai/providers; omit to infer from base_url
+             */
+            provider?: string | null;
         };
         /** AccessProfile */
         AccessProfile: {
@@ -3298,14 +3532,45 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** AuditChange */
+        AuditChange: {
+            /** Field */
+            field: string;
+            /** New */
+            new?: unknown;
+            /** Old */
+            old?: unknown;
+        };
+        /** AuditFilterOptions */
+        AuditFilterOptions: {
+            /** Actions */
+            actions: components["schemas"]["AuditOption"][];
+            /** Categories */
+            categories: components["schemas"]["AuditOption"][];
+            /** Entity Types */
+            entity_types: components["schemas"]["AuditOption"][];
+            /** Users */
+            users: components["schemas"]["AuditOption"][];
+        };
         /** AuditLogResponse */
         AuditLogResponse: {
             /** Action */
             action: string;
+            /** Action Label */
+            action_label: string;
+            /** Category */
+            category: string;
+            /**
+             * Changes
+             * @default []
+             */
+            changes: components["schemas"]["AuditChange"][];
             /** Details */
             details: string | null;
             /** Entity Id */
             entity_id: number | null;
+            /** Entity Label */
+            entity_label: string;
             /** Entity Name */
             entity_name: string | null;
             /** Entity Type */
@@ -3318,6 +3583,8 @@ export interface components {
             new_values: Record<string, never> | null;
             /** Old Values */
             old_values: Record<string, never> | null;
+            /** Summary */
+            summary: string;
             /**
              * Timestamp
              * Format: date-time
@@ -3327,6 +3594,15 @@ export interface components {
             user_id: number | null;
             /** User Name */
             user_name: string | null;
+        };
+        /** AuditOption */
+        AuditOption: {
+            /** Category */
+            category?: string | null;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
         };
         /** AutoRenewalLogEntry */
         AutoRenewalLogEntry: {
@@ -3450,6 +3726,8 @@ export interface components {
         BorrowResponse: {
             /** Asset Id */
             asset_id: number | null;
+            /** Asset Type */
+            asset_type?: string | null;
             /**
              * Borrowed Date
              * Format: date
@@ -3486,6 +3764,8 @@ export interface components {
         };
         /** BorrowUpdate */
         BorrowUpdate: {
+            /** Asset Id */
+            asset_id?: number | null;
             /** Borrowed Date */
             borrowed_date?: string | null;
             /** Borrower Email */
@@ -3607,6 +3887,13 @@ export interface components {
             rates?: {
                 [key: string]: number;
             };
+            /**
+             * Rates Updated At
+             * @description Ignored on write; the server records when each rate changed
+             */
+            rates_updated_at?: {
+                [key: string]: string;
+            } | null;
         };
         /** CurrentUser */
         CurrentUser: {
@@ -3641,6 +3928,38 @@ export interface components {
             roles: string[];
             /** Username */
             username?: string | null;
+        };
+        /** DepartmentCreate */
+        DepartmentCreate: {
+            /** Name */
+            name: string;
+        };
+        /** DepartmentResponse */
+        DepartmentResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Employee Count
+             * @default 0
+             */
+            employee_count: number;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** DepartmentUpdate */
+        DepartmentUpdate: {
+            /** Name */
+            name?: string | null;
         };
         /** DocumentLinkIn */
         DocumentLinkIn: {
@@ -3762,6 +4081,8 @@ export interface components {
             active?: boolean | null;
             /** Business Units */
             business_units?: string[] | null;
+            /** Department */
+            department?: string | null;
             /** Ids */
             ids: number[];
         };
@@ -3778,6 +4099,10 @@ export interface components {
             business_unit?: string | null;
             /** Business Units */
             business_units?: string[];
+            /** Country */
+            country?: string | null;
+            /** Department */
+            department?: string | null;
             /** Email */
             email?: string | null;
             /** Gender */
@@ -3842,11 +4167,15 @@ export interface components {
              * @default []
              */
             business_units: string[];
+            /** Country */
+            country?: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Department */
+            department?: string | null;
             /** Email */
             email: string | null;
             /** Gender */
@@ -3886,6 +4215,10 @@ export interface components {
             business_unit?: string | null;
             /** Business Units */
             business_units?: string[] | null;
+            /** Country */
+            country?: string | null;
+            /** Department */
+            department?: string | null;
             /** Email */
             email?: string | null;
             /** Gender */
@@ -3947,6 +4280,92 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HistoryChange */
+        HistoryChange: {
+            /** After */
+            after?: unknown;
+            /** Before */
+            before?: unknown;
+            /** Field */
+            field: string;
+            /** Label */
+            label: string;
+        };
+        /** HistoryEntry */
+        HistoryEntry: {
+            /** Action */
+            action: string;
+            /** Actor Id */
+            actor_id?: number | null;
+            /** Actor Name */
+            actor_name?: string | null;
+            /** Audit Id */
+            audit_id?: number | null;
+            /**
+             * Changes
+             * @default []
+             */
+            changes: components["schemas"]["HistoryChange"][];
+            /** Details */
+            details?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            link?: components["schemas"]["HistoryLink"] | null;
+            /**
+             * Restorable
+             * @default false
+             */
+            restorable: boolean;
+            /**
+             * Subject
+             * @default false
+             */
+            subject: boolean;
+            /** Summary */
+            summary: string;
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+        };
+        /** HistoryKind */
+        HistoryKind: {
+            /** Count */
+            count: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** HistoryLink */
+        HistoryLink: {
+            /** Id */
+            id: number;
+            /** Slug */
+            slug?: string | null;
+            /** Type */
+            type: string;
+        };
+        /** HistoryPage */
+        HistoryPage: {
+            /** Can Restore */
+            can_restore: boolean;
+            /** Items */
+            items: components["schemas"]["HistoryEntry"][];
+            /** Kinds */
+            kinds: components["schemas"]["HistoryKind"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
         };
         /** Holding */
         Holding: {
@@ -4036,6 +4455,8 @@ export interface components {
             asset_name?: string | null;
             /** Asset Status */
             asset_status?: string | null;
+            /** Asset Type */
+            asset_type?: string | null;
             /**
              * Body Condition
              * @default Good
@@ -4060,6 +4481,8 @@ export interface components {
             notes?: string | null;
             /** Operating System */
             operating_system?: string | null;
+            /** Serial Number */
+            serial_number?: string | null;
         };
         /** MaintenanceUpdate */
         MaintenanceUpdate: {
@@ -4946,6 +5369,8 @@ export interface components {
             asset_id: number;
             /** Asset Name */
             asset_name?: string | null;
+            /** Asset Type */
+            asset_type?: string | null;
             /** Cost */
             cost?: string | null;
             /**
@@ -4966,6 +5391,8 @@ export interface components {
              * Format: date
              */
             repair_date: string;
+            /** Serial Number */
+            serial_number?: string | null;
             /**
              * Status
              * @default In Progress
@@ -5011,8 +5438,28 @@ export interface components {
              */
             email: string;
         };
+        /** RestorePreview */
+        RestorePreview: {
+            /** Audit Id */
+            audit_id: number;
+            /** Changes */
+            changes: components["schemas"]["HistoryChange"][];
+        };
+        /** RestoreResult */
+        RestoreResult: {
+            /** Audit Id */
+            audit_id: number;
+            /** Changes */
+            changes: components["schemas"]["HistoryChange"][];
+            /** Restored Entry Id */
+            restored_entry_id?: number | null;
+        };
         /** ReturnRequest */
         ReturnRequest: {
+            /** Condition */
+            condition?: string | null;
+            /** Notes */
+            notes?: string | null;
             /** Returned Date */
             returned_date?: string | null;
         };
@@ -5068,9 +5515,8 @@ export interface components {
             /**
              * Scope
              * @default records
-             * @enum {string}
              */
-            scope: "records" | "assets";
+            scope: string;
             /** Sort */
             sort?: Record<string, never> | null;
             /** Visible Columns */
@@ -5263,6 +5709,11 @@ export interface components {
             is_superuser: boolean;
             /** Last Login */
             last_login: string | null;
+            /**
+             * Mfa Enabled
+             * @default false
+             */
+            mfa_enabled: boolean;
             /** Name */
             name: string;
             /** Permissions */
@@ -5730,6 +6181,13 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                asset_type?: string | null;
+                issues?: boolean | null;
+                body_condition?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                sort?: string;
+                order?: string;
                 page?: number;
                 page_size?: number;
             };
@@ -5763,6 +6221,15 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                status?: string | null;
+                vendor?: string | null;
+                asset_type?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                cost_min?: number | null;
+                cost_max?: number | null;
+                sort?: string;
+                order?: string;
                 page?: number;
                 page_size?: number;
             };
@@ -6444,8 +6911,19 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                /** @description Comma list of entity types */
                 entity_type?: string | null;
-                user_id?: number | null;
+                /** @description Comma list of user ids; 0 means system jobs */
+                user_id?: string | null;
+                /** @description Comma list of raw action strings */
+                action?: string | null;
+                /** @description change, signin, deletion or other */
+                category?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                q?: string | null;
+                sort?: string;
+                order?: string;
             };
             header?: never;
             path?: never;
@@ -6469,6 +6947,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_filter_options_api_v1_audit_logs_filters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditFilterOptions"];
                 };
             };
         };
@@ -6704,6 +7202,16 @@ export interface operations {
                 status?: string | null;
                 q?: string | null;
                 employee_id?: number | null;
+                employee_ids?: string | null;
+                asset_type?: string | null;
+                borrowed_from?: string | null;
+                borrowed_to?: string | null;
+                due_from?: string | null;
+                due_to?: string | null;
+                returned_from?: string | null;
+                returned_to?: string | null;
+                sort?: string;
+                order?: string;
                 deleted?: boolean;
                 page?: number;
                 page_size?: number;
@@ -7116,15 +7624,145 @@ export interface operations {
             };
         };
     };
+    list_departments_api_v1_departments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentResponse"][];
+                };
+            };
+        };
+    };
+    create_department_api_v1_departments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepartmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_department_api_v1_departments__dept_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dept_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepartmentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepartmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_department_api_v1_departments__dept_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dept_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_api_v1_documents_get: {
         parameters: {
             query?: {
                 q?: string | null;
+                /** @description Comma list of categories */
                 category?: string | null;
                 entity_type?: string | null;
                 entity_id?: number | null;
                 expiring_before?: string | null;
                 deleted?: boolean;
+                /** @description Comma list: asset, employee, record, borrow, none */
+                linked?: string | null;
+                /** @description Comma list: expired, expiring, active, none */
+                expiry?: string | null;
+                expiry_from?: string | null;
+                expiry_to?: string | null;
+                uploaded_from?: string | null;
+                uploaded_to?: string | null;
+                /** @description Comma list: pdf, image, text, office, other */
+                file_type?: string | null;
+                sort?: string | null;
+                order?: string;
                 page?: number;
                 page_size?: number;
             };
@@ -7203,6 +7841,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    document_tab_counts_api_v1_documents_tab_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -7957,6 +8617,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    entity_history_api_v1_history__entity___entity_id__get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                entity: "asset" | "record" | "employee";
+                entity_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_version_api_v1_history__entity___entity_id__revert__audit_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity: "asset" | "record" | "employee";
+                entity_id: number;
+                audit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_preview_api_v1_history__entity___entity_id__revert__audit_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entity: "asset" | "record" | "employee";
+                entity_id: number;
+                audit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestorePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -9708,7 +10470,17 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                /** @description Comma list: sent, failed, pending, processing, retry */
                 status?: string | null;
+                q?: string | null;
+                /** @description Comma list of record type ids */
+                record_type_ids?: string | null;
+                /** @description Comma list of recipient ids */
+                recipient_ids?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                sort?: string | null;
+                order?: string;
             };
             header?: never;
             path?: never;
@@ -10124,6 +10896,37 @@ export interface operations {
             };
         };
     };
+    upcoming_renewals_api_v1_reminders_upcoming_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     allocation_report_api_v1_reports_allocation_get: {
         parameters: {
             query: {
@@ -10187,6 +10990,14 @@ export interface operations {
                 from?: string | null;
                 to?: string | null;
                 format?: string;
+                /** @description JSON of the table's panel filters, keyed by column */
+                filters?: string | null;
+                /** @description Text matched against every column */
+                search?: string | null;
+                sort?: string | null;
+                order?: string;
+                /** @description Comma-separated column keys to include */
+                columns?: string | null;
                 q?: string | null;
                 asset_type?: string | null;
                 assignment_status?: string | null;
@@ -10817,6 +11628,92 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AISettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_models_api_v1_settings_ai_models_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIProbe"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_providers_api_v1_settings_ai_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    ai_test_api_v1_settings_ai_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIProbe"];
             };
         };
         responses: {
@@ -11698,7 +12595,7 @@ export interface operations {
         parameters: {
             query?: {
                 record_type_id?: number | null;
-                scope?: "records" | "assets";
+                scope?: string;
             };
             header?: never;
             path?: never;

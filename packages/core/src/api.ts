@@ -49,7 +49,7 @@ export function createApi(t: Transport) {
       list: (params: QueryParams = {}) => get<T.Page<T.Borrow>>('/borrows', params),
       create: (body: T.BorrowCreate) => post<T.Borrow>('/borrows', body),
       update: (id: number, body: Partial<T.BorrowCreate> & { returned_date?: string | null }) => patch<T.Borrow>(`/borrows/${id}`, body),
-      return: (id: number, returned_date?: string) => post<T.Borrow>(`/borrows/${id}/return`, { returned_date }),
+      return: (id: number, returned_date?: string, extra: { condition?: string | null; notes?: string | null } = {}) => post<T.Borrow>(`/borrows/${id}/return`, { returned_date, ...extra }),
       remove: (id: number) => del(`/borrows/${id}`),
       restore: (id: number) => post<T.Borrow>(`/borrows/${id}/restore`),
     },
@@ -76,6 +76,12 @@ export function createApi(t: Transport) {
       offboard: (id: number, body: T.OffboardRequest) => post<T.OffboardResult>(`/employees/${id}/offboard`, body),
     },
     dashboard: { assets: () => get<T.AssetSummary>('/dashboard/assets') },
+    history: {
+      list: (entity: T.HistoryEntity, id: number, params: QueryParams = {}) => get<T.HistoryPage>(`/history/${entity}/${id}`, params),
+      previewRestore: (entity: T.HistoryEntity, id: number, auditId: number) =>
+        get<T.HistoryRestorePreview>(`/history/${entity}/${id}/revert/${auditId}/preview`),
+      restore: (entity: T.HistoryEntity, id: number, auditId: number) => post<T.HistoryRestorePreview>(`/history/${entity}/${id}/revert/${auditId}`),
+    },
     reports: {
       assetCatalog: () => get<{ kind: T.AssetReportKind; title: string }[]>('/reports/assets'),
       asset: (kind: T.AssetReportKind, params: QueryParams = {}) => get<T.AssetReport>(`/reports/assets/${kind}`, params),

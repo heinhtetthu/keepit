@@ -122,7 +122,7 @@ def saved_template(record_type):
 
 def field_text(field, value):
     if value is None or value == "" or value == []:
-        return "—"
+        return "-"
     options = {o.value: o.label for o in field.options} if field.field_type in {"select", "multi_select"} else {}
     if field.field_type == "select":
         return options.get(str(value), str(value))
@@ -161,7 +161,7 @@ def render(template, values):
             if spec or conversion:
                 raise ValidationException("Variables cannot use format specifications or conversions")
             value = values[key]
-            parts.append(escape("—" if value is None else str(value), quote=True))
+            parts.append(escape("-" if value is None else str(value), quote=True))
     except ValueError:
         raise ValidationException("Unmatched braces. Use {variable} for values and {{ or }} for literal braces.")
     return normalize_message("".join(parts))

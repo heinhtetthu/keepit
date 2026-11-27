@@ -37,7 +37,7 @@ function LevelPicker({ levels, value, onChange, disabled }: { levels: LevelInfo[
       <div role="radiogroup" className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 sm:grid-cols-4">
         {levels.map((l) => (
           <button key={l.key} type="button" role="radio" aria-checked={value === l.key} disabled={disabled} onClick={() => onChange(l.key)}
-            className={cn('press rounded-lg px-2 py-1.5 text-sm font-medium', value === l.key ? 'bg-white text-primary shadow-soft' : 'text-gray-600 hover:text-gray-900')}>
+            className={cn('press whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-medium', value === l.key ? 'bg-white text-primary shadow-soft' : 'text-gray-600 hover:text-gray-900')}>
             {l.title}
           </button>
         ))}
@@ -133,12 +133,12 @@ export default function AccessDialog({ user, onClose }: { user: { id: number; na
                     <li key={t.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
                       <TypeIcon icon={t.icon} className="h-4 w-4 text-gray-500" />
                       <span className="flex-1 text-sm text-gray-800">{t.name}</span>
-                      <div role="radiogroup" aria-label={`${t.name} access`} className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
+                      <div role="radiogroup" aria-label={`${t.name} access`} className="flex shrink-0 rounded-lg bg-gray-100 p-0.5 text-xs font-medium">
                         {([['none', 'Hidden', EyeOff], ['view', 'View', Eye], ['edit', 'Edit', Pencil]] as const).map(([k, label, I]) => (
                           <button key={k} type="button" role="radio" aria-checked={g === k} disabled={recordsOff}
                             title={k === 'edit' && !editCapable ? 'Needs Records level Editor or Manager to take effect' : undefined}
                             onClick={() => setGrant(t.id, k)}
-                            className={cn('press inline-flex items-center gap-1 rounded-md px-2 py-1', g === k ? 'bg-white text-primary shadow-soft' : 'text-gray-500 hover:text-gray-800')}>
+                            className={cn('press inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-1', g === k ? 'bg-white text-primary shadow-soft' : 'text-gray-500 hover:text-gray-800')}>
                             <I className="h-3 w-3" />{label}
                           </button>
                         ))}

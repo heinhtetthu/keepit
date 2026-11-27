@@ -63,6 +63,8 @@
 
 @layer base {
   * { @apply border-border; }
+  /* Pill tags (status, roles, access levels) always stay on one line. */
+  span.rounded-full, div.rounded-full.inline-flex { white-space: nowrap; }
   html { -webkit-tap-highlight-color: transparent; }
   body {
     @apply bg-background text-foreground antialiased;

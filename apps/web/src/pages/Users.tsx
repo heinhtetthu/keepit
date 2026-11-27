@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, X, KeyRound, Shield, ShieldCheck } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, KeyRound, Shield, ShieldCheck, Users as UsersIcon } from 'lucide-react'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import RowMenu from '@/components/ui/menu'
 import { useAuthStore } from '../store/auth'
-import AccessDialog from '../components/AccessDialog'
+import AccessDialog, { useAccessCatalog, type AccessCatalog } from '../components/AccessDialog'
 import RolesExplained from '../components/RolesExplained'
-import { TableCard, TableScrollArea, usePageSize, TH_STICKY, TablePager } from '../components/table_shell'
+import {
+  DataTable, EmptyRows, TableTabs, TableToolbar, TitleCell, clientRows, filterField, filterRows, useTableState,
+  type Column, type SortDef,
+} from '@/components/data-table'
 import { cn } from '@/lib/utils'
 import type { NotificationRecipient } from '../types'
 
@@ -20,8 +24,9 @@ interface UserRow {
   name: string
   is_active: boolean
   is_superuser: boolean
+  mfa_enabled?: boolean
   last_login: string | null
-  roles: { id: number; name: string; scope?: string | null }[]
+  roles: { id: number; name: string; scope?: string | null; level?: number | null }[]
   created_at: string
 }
 
@@ -43,12 +48,60 @@ interface PermissionRow {
 
 const emptyDraft = { name: '', email: '', username: '', password: '', role_id: null as number | null, is_active: true }
 
+/* Users are few, so the list loads whole and is searched, filtered, sorted and paged in the browser. */
+async function fetchAllUsers(): Promise<UserRow[]> {
+  const out: UserRow[] = []
+  for (let page = 1; page <= 50; page++) {
+    const data = (await api.get('/users', { params: { page, page_size: 100 } })).data
+    out.push(...(data.items ?? []))
+    if (page >= (data.total_pages ?? 1)) break
+  }
+  return out
+}
+
+type Area = 'assets' | 'records'
+const NO_ACCESS = 'No access'
+const NO_USERS: UserRow[] = []
+const FULL_ACCESS = 'Full access'
+const SCOPED = new Set(['assets', 'records', 'workspace', 'assistant'])
+const pill = 'whitespace-nowrap'
+const dash = <span className="text-gray-400">-</span>
+
+/** Level title for one area, e.g. "Editor"; superusers have full access. */
+function levelOf(u: UserRow, area: Area, cat?: AccessCatalog): string {
+  if (u.is_superuser) return FULL_ACCESS
+  const role = u.roles.find((r) => r.scope === area)
+  if (!role) return NO_ACCESS
+  return (role.level != null && cat?.[area].levels[role.level]?.title) || role.name
+}
+const extrasOf = (u: UserRow) => u.roles.filter((r) => r.scope === 'workspace' || r.scope === 'assistant').map((r) => r.name)
+const customOf = (u: UserRow) => u.roles.filter((r) => !r.scope || !SCOPED.has(r.scope)).map((r) => r.name)
+
+function LevelPill({ level, area }: { level: string; area: Area }) {
+  if (level === NO_ACCESS) return <span className="whitespace-nowrap text-xs text-gray-400">{NO_ACCESS}</span>
+  if (level === FULL_ACCESS) return <Badge variant="default" className={pill}>{FULL_ACCESS}</Badge>
+  return <Badge variant="secondary" className={cn(pill, area === 'assets' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700')}>{level}</Badge>
+}
+
+type Tab = 'all' | 'active' | 'inactive' | 'superusers' | 'no_mfa'
+const TABS: { id: Tab; label: string; test: (u: UserRow) => boolean; tone?: string }[] = [
+  { id: 'all', label: 'All', test: () => true },
+  { id: 'active', label: 'Active', test: (u) => u.is_active },
+  { id: 'inactive', label: 'Inactive', test: (u) => !u.is_active },
+  { id: 'superusers', label: 'Superusers', test: (u) => u.is_superuser },
+  { id: 'no_mfa', label: 'Without two-factor', test: (u) => u.is_active && !u.mfa_enabled, tone: 'text-amber-700' },
+]
+
+const SORTS: SortDef[] = [
+  { id: 'name', label: 'Name' }, { id: 'username', label: 'Username' }, { id: 'email', label: 'Email' },
+  { id: 'assets', label: 'Assets access' }, { id: 'records', label: 'Records access' }, { id: 'status', label: 'Status' },
+  { id: 'last_login', label: 'Last sign-in', kind: 'date' }, { id: 'created_at', label: 'Added', kind: 'date' },
+]
+
 export default function Users() {
   const queryClient = useQueryClient()
   const { hasPermission, user: me } = useAuthStore()
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = usePageSize('users')
+  const t = useTableState({ key: 'users', defaultSort: 'name', defaultOrder: 'asc', defaultColumns: ['email', 'assets', 'records', 'extras', 'mfa', 'status', 'last_login'] })
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
@@ -58,11 +111,8 @@ export default function Users() {
   const canEdit = hasPermission('user.edit')
   const canDelete = hasPermission('user.delete')
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['users', search, page, pageSize],
-    queryFn: async () => (await api.get('/users', { params: { search, page, page_size: pageSize } })).data,
-    retry: 1,
-  })
+  const { data: users, isLoading, isFetching, error } = useQuery({ queryKey: ['users', 'all'], queryFn: fetchAllUsers, retry: 1 })
+  const { data: cat } = useAccessCatalog()
 
   const { data: roles } = useQuery<RoleRow[]>({
     queryKey: ['roles'],
@@ -206,126 +256,102 @@ export default function Users() {
     saveMutation.mutate(payload)
   }
 
+
+  /* ---------- list ---------- */
+  const get = (u: UserRow, slug: string): unknown => {
+    switch (slug) {
+      case 'assets': case 'records': return levelOf(u, slug, cat)
+      case 'extras': return extrasOf(u)
+      case 'custom': return customOf(u)
+      case 'status': return u.is_active ? 'Active' : 'Inactive'
+      case 'mfa': return u.mfa_enabled ? 'On' : 'Off'
+      case 'superuser': return u.is_superuser
+      case 'last_login': return u.last_login
+      case 'created_at': return u.created_at
+      case 'name': return u.name
+      case 'username': return u.username
+      case 'email': return u.email
+      default: return null
+    }
+  }
+  const fields = useMemo(() => {
+    const levels = (area: Area) => [FULL_ACCESS, ...(cat?.[area].levels ?? []).filter((l) => l.key !== 'none').map((l) => l.title), NO_ACCESS]
+    const extra = (roles ?? []).filter((r) => r.scope === 'workspace' || r.scope === 'assistant').map((r) => r.name)
+    const custom = (roles ?? []).filter((r) => !r.scope || !SCOPED.has(r.scope)).map((r) => r.name)
+    return [
+      filterField('assets', 'Assets access', 'select', levels('assets')),
+      filterField('records', 'Records access', 'select', levels('records')),
+      filterField('extras', 'Extra access', 'select', extra),
+      ...(custom.length ? [filterField('custom', 'Custom role', 'select', custom)] : []),
+      filterField('status', 'Status', 'select', ['Active', 'Inactive']),
+      filterField('mfa', 'Two-factor sign-in', 'select', [{ value: 'On', label: 'Turned on' }, { value: 'Off', label: 'Not set up' }]),
+      filterField('superuser', 'Superuser', 'boolean'),
+      filterField('last_login', 'Last sign-in', 'date'),
+      filterField('created_at', 'Added', 'date'),
+    ]
+  }, [cat, roles])
+
+  const tab = TABS.find((x) => x.id === t.tab) ?? TABS[0]
+  const all = users ?? NO_USERS
+  const counts = useMemo(() => {
+    const base = filterRows(all, t.filters, fields, get)
+    return Object.fromEntries(TABS.map((x) => [x.id, base.filter(x.test).length])) as Record<Tab, number>
+  }, [all, t.filters, fields]) // eslint-disable-line react-hooks/exhaustive-deps -- get reads cat, already behind fields
+  const view = clientRows(all.filter(tab.test), t, fields, get, (u) => `${u.name} ${u.email} ${u.username ?? ''}`)
+
+  const columns: Column<UserRow>[] = [
+    { id: 'name', label: 'Name', sort: 'name', locked: true, render: (u) => <TitleCell title={u.name} sub={u.username ? `@${u.username}` : u.email} /> },
+    { id: 'username', label: 'Username', sort: 'username', render: (u) => u.username ? <span className="font-mono text-xs">{u.username}</span> : dash },
+    { id: 'email', label: 'Email', sort: 'email', render: (u) => u.email },
+    { id: 'assets', label: 'Assets', sort: 'assets', render: (u) => <LevelPill area="assets" level={levelOf(u, 'assets', cat)} /> },
+    { id: 'records', label: 'Records', sort: 'records', render: (u) => <LevelPill area="records" level={levelOf(u, 'records', cat)} /> },
+    { id: 'extras', label: 'Extra access', render: (u) => extrasOf(u).length
+      ? <div className="flex gap-1">{extrasOf(u).map((n) => <Badge key={n} variant="secondary" className={pill}>{n}</Badge>)}</div> : dash },
+    { id: 'custom', label: 'Custom roles', render: (u) => customOf(u).length
+      ? <div className="flex gap-1">{customOf(u).map((n) => <Badge key={n} variant="outline" className={pill}>{n}</Badge>)}</div> : dash },
+    { id: 'superuser', label: 'Superuser', render: (u) => u.is_superuser ? <Badge variant="default" className={pill}>Superuser</Badge> : dash },
+    { id: 'mfa', label: 'Two-factor', render: (u) => u.mfa_enabled
+      ? <Badge variant="success" className={pill}>On</Badge> : <Badge variant="secondary" className={cn(pill, 'text-gray-500')}>Off</Badge> },
+    ...(canManageRecipientsColumn ? [{ id: 'telegram', label: 'Telegram accounts', render: (u: UserRow) => (recipientOwners.get(u.id) || []).length ? (
+      <div className="flex gap-1">{(recipientOwners.get(u.id) || []).map((r) => (
+        <span key={r.id} className="inline-flex items-center whitespace-nowrap rounded border bg-gray-50 px-1.5 py-0.5 text-[11px] text-gray-600" title={`Chat ID ${r.telegram_chat_id}`}>{r.display_name}</span>
+      ))}</div>) : dash }] : []),
+    { id: 'status', label: 'Status', sort: 'status', render: (u) => (
+      <button disabled={!canEdit || u.id === me?.id} onClick={(e) => { e.stopPropagation(); toggleActive.mutate(u) }} className="disabled:cursor-default"
+        title={u.id === me?.id ? "You can't deactivate yourself" : (u.is_active ? 'Click to deactivate' : 'Click to activate')}>
+        <Badge variant={u.is_active ? 'success' : 'destructive'} className={pill}>{u.is_active ? 'Active' : 'Inactive'}</Badge>
+      </button>) },
+    { id: 'last_login', label: 'Last sign-in', sort: 'last_login', render: (u) => <span className="text-xs tabular-nums text-gray-500">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</span> },
+    { id: 'created_at', label: 'Added', sort: 'created_at', render: (u) => <span className="text-xs tabular-nums text-gray-500">{new Date(u.created_at).toLocaleDateString()}</span> },
+  ]
+
+  const rowMenu = (u: UserRow) => (
+    <RowMenu items={[
+      { label: 'Access', icon: <ShieldCheck />, onSelect: () => setAccessFor(u), hidden: !canEdit },
+      { label: 'Edit user', icon: <Pencil />, onSelect: () => openEdit(u), hidden: !canEdit },
+      { label: 'Delete user', icon: <Trash2 />, danger: true, divider: true, hidden: !canDelete || u.id === me?.id,
+        onSelect: () => { if (confirm(`Delete user "${u.name}"? This cannot be undone.`)) deleteMutation.mutate(u.id) } },
+    ]} />
+  )
+
   return (
     <div className="space-y-5">
-      <div>
+      <div className="flex flex-col gap-4">
         <p className="text-sm text-gray-500">Each person has separate access to <b>assets</b> and <b>records</b>; record access is then set per record type as View or Edit.</p>
-      </div>
 
-      <TableCard
-        header={
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b shrink-0">
-            <div className="relative w-52 sm:w-64">
-              <Input
-                placeholder="Search by name or email..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              />
-            </div>
-            {canCreate && <Button className="ml-auto shrink-0" size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1" /> Add User</Button>}
-          </div>
-        }
-        footer={<TablePager shown={data?.items?.length || 0} total={data?.total || 0} noun="users" page={page} pages={data?.total_pages || 1} onPage={setPage} pageSize={pageSize} onPageSize={(n) => { setPageSize(n); setPage(1) }} />}
-      >
-          {error ? (
-            <div className="p-4 rounded-md bg-red-50 text-red-700 text-sm">Failed to load users.</div>
-          ) : isLoading ? (
-            <p className="text-gray-500 text-sm">Loading...</p>
-          ) : (
-            <TableScrollArea className="max-h-[calc(100vh-420px)] min-h-[200px]">
-              <table className="w-full text-sm">
-                <thead className="border-b text-left text-xs text-gray-500">
-                  <tr>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Name</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Username</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Email</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Access</th>
-                    {canManageRecipientsColumn && <th className={cn('px-3 py-2', TH_STICKY)}>Telegram accounts</th>}
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Status</th>
-                    <th className={cn('px-3 py-2', TH_STICKY)}>Last Login</th>
-                    <th className={cn('px-3 py-2 text-right', TH_STICKY)}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {(data?.items || []).map((u: UserRow) => (
-                    <tr key={u.id} className={`hover:bg-gray-50 ${!u.is_active ? 'opacity-60' : ''}`}>
-                      <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                        {u.name}
-                        {u.is_superuser && <Badge variant="default" className="ml-2">superuser</Badge>}
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                        <span className="font-mono text-xs">{u.username || '-'}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{u.email}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {u.is_superuser ? <Badge variant="default">Full access</Badge> : (u.roles || []).map((r) => (
-                            <Badge key={r.id} variant="secondary" className={cn(r.scope === 'assets' && 'bg-sky-50 text-sky-700', r.scope === 'records' && 'bg-violet-50 text-violet-700')}>{r.name}</Badge>
-                          ))}
-                          {!u.is_superuser && (!u.roles || u.roles.length === 0) && <span className="text-xs text-gray-400">No access yet</span>}
-                        </div>
-                      </td>
-                      {canManageRecipientsColumn && (
-                        <td className="px-3 py-2.5">
-                          <div className="flex flex-wrap gap-1 max-w-[200px]">
-                            {(recipientOwners.get(u.id) || []).map((r) => (
-                              <span key={r.id} className="inline-flex items-center whitespace-nowrap rounded border bg-gray-50 px-1.5 py-0.5 text-[11px] text-gray-600" title={`Chat ID ${r.telegram_chat_id}`}>
-                                {r.display_name}
-                              </span>
-                            ))}
-                            {(recipientOwners.get(u.id) || []).length === 0 && <span className="text-xs text-gray-300">-</span>}
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-3 py-2.5">
-                        <button
-                          disabled={!canEdit || u.id === me?.id}
-                          onClick={() => toggleActive.mutate(u)}
-                          title={u.id === me?.id ? "You can't deactivate yourself" : (u.is_active ? 'Click to deactivate' : 'Click to activate')}
-                          className="disabled:cursor-default"
-                        >
-                          <Badge variant={u.is_active ? 'success' : 'destructive'}>
-                            {u.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                        {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
-                      </td>
-                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                        {canEdit && (
-                          <Button variant="ghost" size="sm" title="Access to assets and records" onClick={() => setAccessFor(u)}>
-                            <ShieldCheck className="h-3.5 w-3.5" /><span className="hidden xl:inline">Access</span>
-                          </Button>
-                        )}
-                        {canEdit && (
-                          <Button variant="ghost" size="sm" title="Edit user" onClick={() => openEdit(u)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {canDelete && u.id !== me?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => {
-                              if (confirm(`Delete user "${u.name}"? This cannot be undone.`)) deleteMutation.mutate(u.id)
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {(!data?.items || data.items.length === 0) && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No users found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </TableScrollArea>
-          )}
-      </TableCard>
+        <TableTabs tabs={TABS.map((x) => ({ id: x.id, label: x.label, count: users ? counts[x.id] : null, tone: x.tone }))} value={t.tab} onChange={t.setTab} />
+
+        <TableToolbar state={t} searchPlaceholder="Name, email or username…" filterFields={fields} sorts={SORTS} columns={columns}>
+          {canCreate && <Button size="sm" className="sm:ml-auto" onClick={openCreate}><Plus className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Add user</span></Button>}
+        </TableToolbar>
+
+        <DataTable rows={view.rows} rowKey={(u) => u.id} columns={columns} visible={t.columns} sort={t.sort} order={t.order} onSort={t.toggleSort}
+          loading={isLoading} fetching={isFetching && !isLoading} error={error ? 'Failed to load users.' : null}
+          onRowClick={canEdit ? (u) => setAccessFor(u) : undefined} rowClassName={(u) => !u.is_active && 'opacity-60'}
+          actions={canEdit || canDelete ? rowMenu : undefined}
+          empty={<EmptyRows icon={<UsersIcon className="h-9 w-9" />} title="No users match" />}
+          pager={{ page: t.page, pages: view.pages, total: view.total, pageSize: t.pageSize, onPage: t.setPage, onPageSize: t.setPageSize, noun: 'users' }} />
+      </div>
 
       <RolesExplained />
 

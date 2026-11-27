@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import type { Api } from './api'
 import type { QueryParams } from './transport'
+import type { HistoryEntity } from './types'
 
 const ApiContext = createContext<Api | null>(null)
 
@@ -117,4 +118,16 @@ export function useAssetMutation<V, R>(fn: (api: Api, vars: V) => Promise<R>) {
   const api = useApi()
   const invalidate = useInvalidateAssets()
   return useMutation({ mutationFn: (vars: V) => fn(api, vars), onSuccess: () => { void invalidate() } })
+}
+
+/** Activity history of one asset, record or employee; pages are appended for "load more". */
+export function useEntityHistory(entity: HistoryEntity, id: number, kind?: string, pageSize = 20) {
+  const api = useApi()
+  return useInfiniteQuery({
+    queryKey: ['entity-history', entity, id, kind ?? ''],
+    queryFn: ({ pageParam }) => api.history.list(entity, id, { page: pageParam, page_size: pageSize, kind: kind || undefined }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page < last.total_pages ? last.page + 1 : undefined),
+    enabled: id > 0,
+  })
 }

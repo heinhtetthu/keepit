@@ -74,6 +74,10 @@ class User(Base, TimestampMixin, LegacyMixin):
     def has_avatar(self) -> bool:
         return bool(self.avatar_base64 and self.avatar_mime)
 
+    @property
+    def mfa_enabled(self) -> bool:
+        return bool(self.mfa_secret)
+
     roles: Mapped[list[Role]] = relationship(secondary=user_roles, back_populates="users")
 
     @property
