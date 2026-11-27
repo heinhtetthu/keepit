@@ -11,7 +11,7 @@ jobs:
   dependencies:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -44,7 +44,7 @@ jobs:
       FRONTEND_URL: http://host.docker.internal:8091
       CORS_ALLOWED_ORIGINS: http://host.docker.internal:8091
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Initialize disposable local configuration
         # The script runs as root in a container; hand the generated .env (mode 600) back to the runner user
         # so docker compose can read it.
