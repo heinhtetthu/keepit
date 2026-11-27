@@ -45,15 +45,13 @@ jobs:
       CORS_ALLOWED_ORIGINS: http://host.docker.internal:8091
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
       - name: Initialize disposable local configuration
-        # Run on the runner, not in a root container, so the generated .env (mode 600) stays readable here.
+        # The script runs as root in a container; hand the generated .env (mode 600) back to the runner user
+        # so docker compose can read it.
         run: |
           cp .env.example .env
-          python -m pip install -q cryptography
-          python scripts/init-local-security.py
+          docker run --rm -v "$PWD:/workspace" -w /workspace python:3.12-slim sh -c 'pip install -q cryptography && python scripts/init-local-security.py'
+          sudo chown "$(id -u):$(id -g)" .env
       - run: docker compose up -d --build postgres backend frontend
       - name: Wait for disposable application
         run: |
